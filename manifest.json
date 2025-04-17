@@ -1,0 +1,33 @@
+{
+  "name": "Page Summarizer & Word Helper",
+  "version": "0.1",
+  "manifest_version": 3,
+  "action": {
+    "default_title": "Summarize this page",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "css": ["style/bubble.css"],
+      "js": [
+        "lib/Readability.min.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*"
+  ]
+}

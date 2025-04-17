@@ -1,0 +1,17 @@
+body {
+  min-width: 300px;
+  max-width: 400px;
+  font-family: system-ui, sans-serif;
+  padding: 8px;
+}
+
+h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+#summary {
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}

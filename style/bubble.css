@@ -1,0 +1,10 @@
+.word-bubble {
+  position: absolute;
+  max-width: 260px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 2147483647;
+}

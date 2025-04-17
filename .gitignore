@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Environment files (e.g. for your OpenAI key during development)
+.env
+
+# Dependency directories (if you ever use npm/Yarn/pnpm for local tooling)
+node_modules/
+.pnpm-store/
+.yarn/
+
+# Bundler/build output
+dist/
+build/
+
+# Packaged extension artifacts
+*.zip
+*.crx
+
+# Chrome Web Store private key
+*.pem
+
+# IDE / editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*~
+
+# Backup files
+*~
+*.bak
