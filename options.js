@@ -1,9 +1,10 @@
 // Load saved settings when the options page is opened
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const { openaiKey, openaiModel, customPrompt } = await chrome.storage.local.get([
+    const { openaiKey, openaiModel, basePrompt, customPrompt } = await chrome.storage.local.get([
       'openaiKey', 
       'openaiModel',
+      'basePrompt',
       'customPrompt'
     ]);
     
@@ -15,6 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Set model if available, otherwise default will be used from placeholder
     if (openaiModel) {
       document.getElementById('openai-model').value = openaiModel;
+    }
+
+    // Set base prompt if available
+    if (basePrompt) {
+      document.getElementById('base-prompt').value = basePrompt;
     }
 
     // Set custom prompt if available
@@ -30,6 +36,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 document.getElementById('save').addEventListener('click', async () => {
   const openaiKey = document.getElementById('openai-key').value.trim();
   const openaiModel = document.getElementById('openai-model').value.trim();
+  const basePrompt = document.getElementById('base-prompt').value.trim();
   const customPrompt = document.getElementById('custom-prompt').value.trim();
   const statusEl = document.getElementById('status');
   
@@ -62,6 +69,11 @@ document.getElementById('save').addEventListener('click', async () => {
       settings.openaiModel = openaiModel;
     } else {
       settings.openaiModel = 'gpt-4o-mini';
+    }
+    
+    // Add base prompt if provided
+    if (basePrompt) {
+      settings.basePrompt = basePrompt;
     }
     
     // Add custom prompt if provided

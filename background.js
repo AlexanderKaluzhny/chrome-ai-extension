@@ -4,6 +4,7 @@ importScripts('/lib/Readability.min.js');
 const CONFIG = {
   MAX_TEXT_LENGTH: 15000,
   DEFAULT_OPENAI_MODEL: 'gpt-4o-mini',
+  DEFAULT_BASE_PROMPT: 'Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful.',
   DEBUG_MODE: true, // Set to true for development
   MIN_TIME_BETWEEN_REQUESTS: 1000 // 1 second in milliseconds
 };
@@ -69,7 +70,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // Get API key and model from storage
 async function getConfigFromStorage() {
   try {
-    const { openaiKey, openaiModel } = await chrome.storage.local.get(['openaiKey', 'openaiModel']);
+    const { openaiKey, openaiModel, basePrompt } = await chrome.storage.local.get([
+      'openaiKey', 
+      'openaiModel',
+      'basePrompt'
+    ]);
     
     if (!openaiKey) {
       throw new Error('OpenAI API key not found. Please set your API key in the extension options.');
@@ -77,8 +82,10 @@ async function getConfigFromStorage() {
     
     // Use user-specified model or fall back to default
     const model = openaiModel || CONFIG.DEFAULT_OPENAI_MODEL;
+    // Use user-specified base prompt or fall back to default
+    const prompt = basePrompt || CONFIG.DEFAULT_BASE_PROMPT;
     
-    return { apiKey: openaiKey, model };
+    return { apiKey: openaiKey, model, basePrompt: prompt };
   } catch (error) {
     debug('Error retrieving config:', error);
     throw error;
@@ -121,13 +128,14 @@ async function handleSummarizeTab(customPrompt = '') {
       throw new Error(`Error extracting page content: ${pageText.error}`);
     }
 
-    // Get API key and model
-    const { apiKey, model } = await getConfigFromStorage();
+    // Get API key, model, and base prompt
+    const { apiKey, model, basePrompt } = await getConfigFromStorage();
     // Apply rate limiting
     await apiRateLimiter.throttle();
 
-    // Build the prompt based on whether there's a custom prompt or not
-    let promptContent = `Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful.`;
+    // Build the prompt based on base prompt and custom prompt
+    let promptContent = basePrompt;
+    
     // Add custom prompt if provided
     if (customPrompt) {
       promptContent += ` ${customPrompt}`;
@@ -208,7 +216,7 @@ async function lookupWord(word, context) {
     const { apiKey, model } = await getConfigFromStorage();
 
     // Build OpenAI request
-    const prompt = `Explain the meaning of the word "${word}" in the context of the following paragraph:\n\n${context}`;
+    const prompt = `Explain the meaning of the word in the following context:\n\n<word>${word}</word><context>${context}</context>`;
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {

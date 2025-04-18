@@ -75,9 +75,15 @@
   </div>
   
   <div class="form-group">
+    <label for="base-prompt">Base Summarization Prompt</label>
+    <textarea id="base-prompt" placeholder="Summarize the following text in a concise and comprehensive way..."></textarea>
+    <p>This is the main instruction for the summarization. The default is: "Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful."</p>
+  </div>
+  
+  <div class="form-group">
     <label for="custom-prompt">Default Custom Prompt</label>
     <textarea id="custom-prompt" placeholder="Add your default instructions for summarization..."></textarea>
-    <p>These instructions will be added to the summarization request.</p>
+    <p>These additional instructions will be added to the summarization request.</p>
   </div>
   
   <button id="save">Save</button>
