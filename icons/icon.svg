@@ -1,0 +1,17 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Bold, enlarged speech bubble outline -->
+  <rect x="32" y="32" width="960" height="730" rx="80"
+        fill="none" stroke="#8F6BFF" stroke-width="64"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Tail on left-bottom -->
+  <path d="M182 762 L182 870 L282 762"
+        fill="none" stroke="#8F6BFF" stroke-width="64"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Inner summary lines -->
+  <line x1="200" y1="300" x2="824" y2="300"
+        stroke="#8F6BFF" stroke-width="64" stroke-linecap="round"/>
+  <line x1="200" y1="420" x2="760" y2="420"
+        stroke="#8F6BFF" stroke-width="64" stroke-linecap="round"/>
+  <line x1="200" y1="540" x2="600" y2="540"
+        stroke="#8F6BFF" stroke-width="64" stroke-linecap="round"/>
+</svg>
