@@ -40,7 +40,7 @@ function debug(...args) {
 // Message listener
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'SUMMARIZE_TAB') {
-    handleSummarizeTab()
+    handleSummarizeTab(msg.customPrompt)
       .then(summary => sendResponse({ summary }))
       .catch(error => sendResponse({ error: error.message }));
     return true; // Keep the message channel open for async response
@@ -86,7 +86,7 @@ async function getConfigFromStorage() {
 }
 
 // Handle summarization request
-async function handleSummarizeTab() {
+async function handleSummarizeTab(customPrompt = '') {
   try {
     // Get the active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -123,9 +123,16 @@ async function handleSummarizeTab() {
 
     // Get API key and model
     const { apiKey, model } = await getConfigFromStorage();
-
     // Apply rate limiting
     await apiRateLimiter.throttle();
+
+    // Build the prompt based on whether there's a custom prompt or not
+    let promptContent = `Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful.`;
+    // Add custom prompt if provided
+    if (customPrompt) {
+      promptContent += ` ${customPrompt}`;
+    }
+    promptContent += ` <text>${pageText}</text>`;
 
     // Call OpenAI API
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -139,7 +146,7 @@ async function handleSummarizeTab() {
         messages: [
           {
             role: "user",
-            content: `Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful.  <text>${pageText}</text>`,
+            content: promptContent,
           },
         ],
         temperature: 0.3,

@@ -1,7 +1,11 @@
 // Load saved settings when the options page is opened
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const { openaiKey, openaiModel } = await chrome.storage.local.get(['openaiKey', 'openaiModel']);
+    const { openaiKey, openaiModel, customPrompt } = await chrome.storage.local.get([
+      'openaiKey', 
+      'openaiModel',
+      'customPrompt'
+    ]);
     
     // Set API key if available
     if (openaiKey) {
@@ -12,6 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (openaiModel) {
       document.getElementById('openai-model').value = openaiModel;
     }
+
+    // Set custom prompt if available
+    if (customPrompt) {
+      document.getElementById('custom-prompt').value = customPrompt;
+    }
   } catch (error) {
     console.error('Error loading settings:', error);
   }
@@ -21,6 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 document.getElementById('save').addEventListener('click', async () => {
   const openaiKey = document.getElementById('openai-key').value.trim();
   const openaiModel = document.getElementById('openai-model').value.trim();
+  const customPrompt = document.getElementById('custom-prompt').value.trim();
   const statusEl = document.getElementById('status');
   
   try {
@@ -44,14 +54,23 @@ document.getElementById('save').addEventListener('click', async () => {
       return;
     }
     
-    // Validate and save the model
-    if (!openaiModel) {
-      // Use default model from CONFIG if empty (gpt-4o-mini)
-      await chrome.storage.local.set({ openaiKey, openaiModel: 'gpt-4o-mini' });
+    // Prepare settings object
+    const settings = { openaiKey };
+    
+    // Add model if provided, otherwise use default
+    if (openaiModel) {
+      settings.openaiModel = openaiModel;
     } else {
-      // Save the custom model
-      await chrome.storage.local.set({ openaiKey, openaiModel });
+      settings.openaiModel = 'gpt-4o-mini';
     }
+    
+    // Add custom prompt if provided
+    if (customPrompt) {
+      settings.customPrompt = customPrompt;
+    }
+    
+    // Save all settings
+    await chrome.storage.local.set(settings);
     
     showStatus('Settings saved successfully!', 'success');
   } catch (error) {

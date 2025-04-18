@@ -9,6 +9,28 @@ body {
   justify-content: center;
 }
 
+.input-container {
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
 #summarizeBtn {
   background-color: #4285f4;
   color: white;
@@ -27,4 +49,9 @@ body {
 
 #summarizeBtn:active {
   background-color: #2a56c6;
+}
+
+#summarizeBtn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }

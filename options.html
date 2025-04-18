@@ -18,12 +18,16 @@
       margin-bottom: 4px;
       font-weight: 500;
     }
-    input[type="text"], select {
+    input[type="text"], select, textarea {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
       font-size: 14px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
     }
     button {
       background-color: #0078d7;
@@ -68,6 +72,12 @@
   <div class="form-group">
     <label for="openai-model">OpenAI Model</label>
     <input type="text" id="openai-model" placeholder="gpt-4o-mini">
+  </div>
+  
+  <div class="form-group">
+    <label for="custom-prompt">Default Custom Prompt</label>
+    <textarea id="custom-prompt" placeholder="Add your default instructions for summarization..."></textarea>
+    <p>These instructions will be added to the summarization request.</p>
   </div>
   
   <button id="save">Save</button>
