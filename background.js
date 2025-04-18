@@ -3,7 +3,7 @@ importScripts('/lib/Readability.min.js');
 
 const CONFIG = {
   MAX_TEXT_LENGTH: 15000,
-  OPENAI_MODEL: 'gpt-4o-mini',
+  OPENAI_MODEL: 'gpt-4o',
   DEBUG_MODE: true, // Set to true for development
   MIN_TIME_BETWEEN_REQUESTS: 1000 // 1 second in milliseconds
 };
@@ -26,6 +26,10 @@ const apiRateLimiter = {
   }
 };
 
+const summaryStore = {
+  currentSummary: null,
+};
+
 // Debug logging function
 function debug(...args) {
   if (CONFIG.DEBUG_MODE) {
@@ -43,14 +47,20 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'WORD_INFO') {
-    debug('Word info request:', msg.word);
-    lookupWord(msg.word)
-      .then(info => {
-        debug('Word info response:', info);
+    const { word, context } = msg;
+    debug("Word info request:", word, "with context:", context);
+    lookupWord(word, context)
+      .then((info) => {
+        debug("Word info response:", info);
         sendResponse({ info });
       })
-      .catch(error => sendResponse({ error: error.message }));
-    return true; // Keep the message channel open for async response
+      .catch((error) => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (msg.type === 'GET_SUMMARY') {
+    sendResponse({ summary: summaryStore.currentSummary });
+    return true;
   }
   
   return false; // No async response expected for other message types
@@ -99,20 +109,22 @@ async function handleSummarizeTab() {
     await apiRateLimiter.throttle();
 
     // Call OpenAI API
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: CONFIG.OPENAI_MODEL,
-        messages: [{ 
-          role: 'user', 
-          content: `Summarize:\n${pageText}` 
-        }],
-        temperature: 0.3
-      })
+        messages: [
+          {
+            role: "user",
+            content: `Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful.  <text>${pageText}</text>`,
+          },
+        ],
+        temperature: 0.3,
+      }),
     });
 
     if (!response.ok) {
@@ -125,40 +137,77 @@ async function handleSummarizeTab() {
       throw new Error('Invalid response from OpenAI API');
     }
 
-    return data.choices[0].message.content;
+    const summary = data.choices[0].message.content;
+
+    // Store the summary for later retrieval
+    summaryStore.currentSummary = {
+      title: tab.title,
+      content: summary,
+      url: tab.url,
+      timestamp: new Date().toISOString()
+    };
+
+    // If set to open in new tab, create a new tab with the summary
+    await openSummaryInNewTab(tab.title, summary);
+
+    return summary;
   } catch (error) {
     debug('Error in handleSummarizeTab:', error);
     throw error;
   }
 }
 
-// Look up word definition
-async function lookupWord(word) {
-  if (!word || typeof word !== 'string') {
-    return 'Invalid word provided';
-  }
-  
-  const sanitizedWord = word.trim().toLowerCase();
-  if (!sanitizedWord) {
-    return 'Empty word provided';
-  }
-
+// Function to open the summary in a new tab
+async function openSummaryInNewTab(originalTitle, summary) {
   try {
-    // Try dictionary API first
-    await apiRateLimiter.throttle();
-    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(sanitizedWord)}`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data?.[0]?.meanings?.[0]?.definitions?.[0]?.definition) {
-        return data[0].meanings[0].definitions[0].definition;
-      }
-      debug('Dictionary API response had unexpected structure:', data);
-    } else {
-      debug('Dictionary API request failed with status:', response.status);
-    }
+    // Create a new tab with a basic HTML page
+    const newTab = await chrome.tabs.create({
+      url: chrome.runtime.getURL('summary.html'),
+      active: true
+    });
+
+    return true;
   } catch (error) {
-    debug('Exception during fetching from Dictionary API:', error);
+    debug('Error opening summary in new tab:', error);
+    throw error;
+  }
+}
+
+// Look up word definition
+async function lookupWord(word, context) {
+  // If context is available, ask OpenAI for contextual explanation
+  if (context && context.length > 0) {
+    // Rate limit and retrieve API key
+    await apiRateLimiter.throttle();
+    const apiKey = await getKeyFromStorage();
+
+    // Build OpenAI request
+    const prompt = `Explain the meaning of the word "${word}" in the context of the following paragraph:\n\n${context}`;
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: CONFIG.OPENAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful assistant that explains word meanings in context. Keep explanations concise and clear.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.choices[0].message.content.trim();
   }
 }
 

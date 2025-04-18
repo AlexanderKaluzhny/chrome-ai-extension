@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Page Summarizer & Word Helper Options</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 20px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button {
+      background-color: #0078d7;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #0063b1;
+    }
+    .status {
+      margin-top: 16px;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .success {
+      background-color: #dff0d8;
+      color: #3c763d;
+    }
+    .error {
+      background-color: #f2dede;
+      color: #a94442;
+    }
+  </style>
+</head>
+<body>
+  <h1>Extension Settings</h1>
+  
+  <div class="form-group">
+    <label for="openai-key">OpenAI API Key</label>
+    <input type="text" id="openai-key" placeholder="sk-...">
+    <p>Your API key is stored locally (NOT ENCRYPTED) and is only sent to OpenAI's servers.</p>
+  </div>
+  
+  <button id="save">Save</button>
+  
+  <div id="status" class="status" style="display: none;"></div>
+  
+  <script src="options.js"></script>
+</body>
+</html>

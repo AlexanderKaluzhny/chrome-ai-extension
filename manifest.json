@@ -14,7 +14,9 @@
       "matches": [
         "<all_urls>"
       ],
-      "css": ["style/bubble.css"],
+      "css": [
+        "style/bubble.css"
+      ],
       "js": [
         "lib/Readability.min.js",
         "content.js"
@@ -22,10 +24,27 @@
       "run_at": "document_idle"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "summary.html",
+        "style/*",
+        "lib/*"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
   "permissions": [
     "activeTab",
     "scripting",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "https://api.openai.com/*"
