@@ -1,18 +1,26 @@
-// Load saved API key when the options page is opened
+// Load saved settings when the options page is opened
 document.addEventListener('DOMContentLoaded', async () => {
   try {
-    const { openaiKey } = await chrome.storage.local.get('openaiKey');
+    const { openaiKey, openaiModel } = await chrome.storage.local.get(['openaiKey', 'openaiModel']);
+    
+    // Set API key if available
     if (openaiKey) {
       document.getElementById('openai-key').value = openaiKey;
     }
+    
+    // Set model if available, otherwise default will be used from placeholder
+    if (openaiModel) {
+      document.getElementById('openai-model').value = openaiModel;
+    }
   } catch (error) {
-    console.error('Error loading API key:', error);
+    console.error('Error loading settings:', error);
   }
 });
 
-// Save API key when the save button is clicked
+// Save settings when the save button is clicked
 document.getElementById('save').addEventListener('click', async () => {
   const openaiKey = document.getElementById('openai-key').value.trim();
+  const openaiModel = document.getElementById('openai-model').value.trim();
   const statusEl = document.getElementById('status');
   
   try {
@@ -36,12 +44,19 @@ document.getElementById('save').addEventListener('click', async () => {
       return;
     }
     
-    // Save the API key
-    await chrome.storage.local.set({ openaiKey });
-    showStatus('API key saved successfully!', 'success');
+    // Validate and save the model
+    if (!openaiModel) {
+      // Use default model from CONFIG if empty (gpt-4o-mini)
+      await chrome.storage.local.set({ openaiKey, openaiModel: 'gpt-4o-mini' });
+    } else {
+      // Save the custom model
+      await chrome.storage.local.set({ openaiKey, openaiModel });
+    }
+    
+    showStatus('Settings saved successfully!', 'success');
   } catch (error) {
-    console.error('Error saving API key:', error);
-    showStatus(`Error saving API key: ${error.message}`, 'error');
+    console.error('Error saving settings:', error);
+    showStatus(`Error saving settings: ${error.message}`, 'error');
   }
 });
 
@@ -56,7 +71,7 @@ async function testApiKey(apiKey) {
       }
     });
     
-    console.log('Test API key: ', { response})
+    console.log('Test API key: ', { response});
 
     // If we get a 200 response, the key is valid
     return response.status === 200;

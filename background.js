@@ -3,7 +3,7 @@ importScripts('/lib/Readability.min.js');
 
 const CONFIG = {
   MAX_TEXT_LENGTH: 15000,
-  OPENAI_MODEL: 'gpt-4o',
+  DEFAULT_OPENAI_MODEL: 'gpt-4o-mini',
   DEBUG_MODE: true, // Set to true for development
   MIN_TIME_BETWEEN_REQUESTS: 1000 // 1 second in milliseconds
 };
@@ -66,6 +66,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return false; // No async response expected for other message types
 });
 
+// Get API key and model from storage
+async function getConfigFromStorage() {
+  try {
+    const { openaiKey, openaiModel } = await chrome.storage.local.get(['openaiKey', 'openaiModel']);
+    
+    if (!openaiKey) {
+      throw new Error('OpenAI API key not found. Please set your API key in the extension options.');
+    }
+    
+    // Use user-specified model or fall back to default
+    const model = openaiModel || CONFIG.DEFAULT_OPENAI_MODEL;
+    
+    return { apiKey: openaiKey, model };
+  } catch (error) {
+    debug('Error retrieving config:', error);
+    throw error;
+  }
+}
+
 // Handle summarization request
 async function handleSummarizeTab() {
   try {
@@ -102,8 +121,8 @@ async function handleSummarizeTab() {
       throw new Error(`Error extracting page content: ${pageText.error}`);
     }
 
-    // Get API key
-    const apiKey = await getKeyFromStorage();
+    // Get API key and model
+    const { apiKey, model } = await getConfigFromStorage();
 
     // Apply rate limiting
     await apiRateLimiter.throttle();
@@ -116,7 +135,7 @@ async function handleSummarizeTab() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: CONFIG.OPENAI_MODEL,
+        model: model,
         messages: [
           {
             role: "user",
@@ -177,9 +196,9 @@ async function openSummaryInNewTab(originalTitle, summary) {
 async function lookupWord(word, context) {
   // If context is available, ask OpenAI for contextual explanation
   if (context && context.length > 0) {
-    // Rate limit and retrieve API key
+    // Rate limit and retrieve API key and model
     await apiRateLimiter.throttle();
-    const apiKey = await getKeyFromStorage();
+    const { apiKey, model } = await getConfigFromStorage();
 
     // Build OpenAI request
     const prompt = `Explain the meaning of the word "${word}" in the context of the following paragraph:\n\n${context}`;
@@ -190,7 +209,7 @@ async function lookupWord(word, context) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: CONFIG.OPENAI_MODEL,
+        model: model,
         messages: [
           {
             role: "system",
@@ -208,19 +227,5 @@ async function lookupWord(word, context) {
     }
     const data = await response.json();
     return data.choices[0].message.content.trim();
-  }
-}
-
-// Get API key from storage
-async function getKeyFromStorage() {
-  try {
-    const { openaiKey } = await chrome.storage.local.get('openaiKey');
-    if (!openaiKey) {
-      throw new Error('OpenAI API key not found. Please set your API key in the extension options.');
-    }
-    return openaiKey;
-  } catch (error) {
-    debug('Error retrieving API key:', error);
-    throw error;
   }
 }
