@@ -157,7 +157,6 @@ async function handleSummarizeTab(customPrompt = '') {
             content: promptContent,
           },
         ],
-        temperature: 0.3,
       }),
     });
 
@@ -241,7 +240,6 @@ async function lookupWord(word, context, customPrompt) {
           },
           { role: "user", content: prompt },
         ],
-        temperature: 0.3,
       }),
     });
 
