@@ -32,6 +32,7 @@
     {
       "resources": [
         "summary.html",
+        "content.html",
         "style/*",
         "lib/*"
       ],

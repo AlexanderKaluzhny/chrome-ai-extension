@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+</head>
+<body>
+  <!-- Template for the word helper bubble -->
+  <template id="word-helper-template">
+    <div class="word-bubble-header">
+      <span class="selected-word"></span>
+      <button class="close-bubble">×</button>
+    </div>
+    <div class="bubble-actions">
+      <button class="bubble-btn define-btn">Define</button>
+      <button class="bubble-btn prompt-btn">Specify prompt</button>
+    </div>
+    <div class="prompt-container" style="display: none;">
+      <textarea class="prompt-textarea" rows="2" placeholder="Enter your custom prompt..."></textarea>
+      <div class="helper-text">Your prompt will include &lt;word&gt; and &lt;context&gt; tags automatically.</div>
+      <div class="prompt-actions">
+        <button class="bubble-btn save-prompt-btn">Save & Define</button>
+        <button class="bubble-btn cancel-prompt-btn">Cancel</button>
+      </div>
+    </div>
+    <div class="definition-container" style="display: none;"></div>
+  </template>
+</body>
+</html>

@@ -2,7 +2,6 @@ importScripts('/lib/Readability.min.js');
 // importScripts('/lib/DOMPurify.min.js');
 
 const CONFIG = {
-  MAX_TEXT_LENGTH: 15000,
   DEFAULT_OPENAI_MODEL: 'gpt-4o-mini',
   DEFAULT_BASE_PROMPT: 'Summarize the following text in a concise and comprehensive way. Format your response using Markdown with appropriate headings, bullet points, and emphasis where helpful.',
   DEBUG_MODE: true, // Set to true for development
@@ -48,9 +47,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'WORD_INFO') {
-    const { word, context } = msg;
+    const { word, context, customPrompt } = msg;
     debug("Word info request:", word, "with context:", context);
-    lookupWord(word, context)
+    debug("Custom prompt:", customPrompt);
+    lookupWord(word, context, customPrompt)
       .then((info) => {
         debug("Word info response:", info);
         sendResponse({ info });
@@ -208,7 +208,7 @@ async function openSummaryInNewTab(originalTitle, summary) {
 }
 
 // Look up word definition
-async function lookupWord(word, context) {
+async function lookupWord(word, context, customPrompt) {
   // If context is available, ask OpenAI for contextual explanation
   if (context && context.length > 0) {
     // Rate limit and retrieve API key and model
@@ -216,7 +216,15 @@ async function lookupWord(word, context) {
     const { apiKey, model } = await getConfigFromStorage();
 
     // Build OpenAI request
-    const prompt = `Explain the meaning of the word in the following context:\n\n<word>${word}</word><context>${context}</context>`;
+    // Use custom prompt if provided, otherwise use default
+    let prompt;
+    if (customPrompt) {
+      // Ensure the custom prompt includes the word and context tags
+      prompt = `${customPrompt.trim()} <word>${word}</word><context>${context}</context>`;
+    } else {
+      prompt = `Explain the meaning of the word in the following context:\n\n<word>${word}</word><context>${context}</context>`;
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -229,7 +237,7 @@ async function lookupWord(word, context) {
           {
             role: "system",
             content:
-              "You are a helpful assistant that explains word meanings in context. Keep explanations concise and clear.",
+              "You are a helpful assistant who explains what the user asks. Keep explanations concise and clear. Return only the answer without the input data, and don't use HTML tags for formatting.",
           },
           { role: "user", content: prompt },
         ],
