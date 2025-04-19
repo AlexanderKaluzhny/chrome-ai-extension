@@ -1,7 +1,7 @@
 .word-bubble {
   position: absolute;
-  max-width: 300px;
-  min-width: 220px;
+  max-width: 400px;
+  min-width: 280px;
   padding: 10px;
   border-radius: 6px;
   font-size: 14px;
@@ -109,4 +109,6 @@
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid #eee;
+  white-space: pre-line; /* This preserves new lines from the text */
+  line-height: 1.4;      /* Improve readability with better line height */
 }

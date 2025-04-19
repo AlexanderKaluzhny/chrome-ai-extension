@@ -123,8 +123,12 @@ async function showBubbleWithOptions(rect, word, context) {
       customPrompt
     });
     
-    // Display the definition
-    definitionContainer.innerHTML = info;
+    // Format and display the definition with preserved line breaks
+    const formattedInfo = info
+      .replace(/\n\n/g, '<br><br>')  // Convert double line breaks to HTML breaks
+      .replace(/\n/g, '<br>');       // Convert single line breaks as well
+    
+    definitionContainer.innerHTML = formattedInfo;
     
     // Hide the action buttons once definition is shown
     bubble.querySelector('.bubble-actions').style.display = 'none';

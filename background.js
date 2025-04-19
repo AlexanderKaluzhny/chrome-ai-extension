@@ -222,7 +222,7 @@ async function lookupWord(word, context, customPrompt) {
       // Ensure the custom prompt includes the word and context tags
       prompt = `${customPrompt.trim()} <word>${word}</word><context>${context}</context>`;
     } else {
-      prompt = `Explain the meaning of the word in the following context:\n\n<word>${word}</word><context>${context}</context>`;
+      prompt = `Explain the meaning of the word in the following context. Also add 2 examples of using this word in its current meaning. Format your response with proper paragraphs and line breaks for readability. \n\n<word>${word}</word><context>${context}</context>`;
     }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -237,7 +237,7 @@ async function lookupWord(word, context, customPrompt) {
           {
             role: "system",
             content:
-              "You are a helpful assistant who explains what the user asks. Keep explanations concise and clear. Return only the answer without the input data, and don't use HTML tags for formatting.",
+              "You are a helpful assistant who explains what the user asks. Keep explanations concise and clear. Return only the answer without the input data. You can use simple markdown-style formatting with line breaks and paragraphs for readability.",
           },
           { role: "user", content: prompt },
         ],
