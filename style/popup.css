@@ -31,7 +31,14 @@ textarea {
   box-sizing: border-box;
 }
 
-#summarizeBtn {
+.button-group {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0;
+}
+
+#summarizeBtn,
+#readBtn {
   background-color: #4285f4;
   color: white;
   border: none;
@@ -39,19 +46,21 @@ textarea {
   padding: 10px 20px;
   font-size: 14px;
   cursor: pointer;
-  margin: 20px 0;
   transition: background-color 0.3s;
 }
 
-#summarizeBtn:hover {
+#summarizeBtn:hover,
+#readBtn:hover {
   background-color: #3367d6;
 }
 
-#summarizeBtn:active {
+#summarizeBtn:active,
+#readBtn:active {
   background-color: #2a56c6;
 }
 
-#summarizeBtn:disabled {
+#summarizeBtn:disabled,
+#readBtn:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
 }

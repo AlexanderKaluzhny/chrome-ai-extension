@@ -2,7 +2,9 @@
 
 ## Overview
 
-Add a "Read Aloud" feature to the Chrome extension that extracts page content, displays it in a side panel, and reads it aloud using OpenAI's TTS-1 API with streaming audio playback.
+Add a "Read Aloud" feature to the Chrome extension that extracts page content, displays it in Chrome's native Side Panel, and reads it aloud using OpenAI's TTS-1 API with streaming audio playback.
+
+---
 
 ## OpenAI TTS API Reference
 
@@ -17,7 +19,37 @@ Add a "Read Aloud" feature to the Chrome extension that extracts page content, d
 
 **Streaming:** Supports chunk transfer encoding for real-time audio playback.
 
-**Recommended format for streaming:** `mp3` (good balance) or `wav`/`pcm` (fastest, no decoding overhead)
+**Recommended format:** `mp3` (good balance) or `wav`/`pcm` (fastest, no decoding overhead)
+
+---
+
+## Chrome Side Panel API
+
+Chrome's native Side Panel API (available since Chrome 114, Manifest V3) provides a built-in side panel UI that's superior to custom injected panels.
+
+### Manifest Configuration
+
+- Add `side_panel` key with `default_path` pointing to reader HTML
+- Add `sidePanel` to permissions array
+
+### Key API Methods
+
+| Method | Purpose |
+|--------|---------|
+| `chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true })` | Open panel when toolbar icon clicked |
+| `chrome.sidePanel.open({ windowId })` | Programmatically open the panel |
+| `chrome.sidePanel.setOptions({ tabId, path, enabled })` | Enable/disable panel for specific tabs |
+
+### Benefits Over Custom Injected Panel
+
+| Native Side Panel | Custom Injected Panel |
+|-------------------|----------------------|
+| Native Chrome UI | Injected DOM element |
+| Persists across tab switches | Lost on navigation |
+| Full Chrome API access | Limited to content script APIs |
+| User can resize/dock | Fixed position |
+| No CSS conflicts with page | Potential style conflicts |
+| Works on all pages including chrome:// | Can't work on restricted pages |
 
 ---
 
@@ -25,363 +57,259 @@ Add a "Read Aloud" feature to the Chrome extension that extracts page content, d
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         popup.js                                 │
+│                         popup.html/js                            │
 │  [Summarize] [Read]  ←── New "Read" button                      │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ OPEN_READER message
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      background.js                               │
-│  - Routes messages                                               │
-│  - Injects reader content script                                 │
+│  - Opens side panel via chrome.sidePanel.open()                  │
+│  - Extracts page content via scripting.executeScript()           │
+│  - Stores extracted content for side panel retrieval             │
+│  - Provides API key to side panel                                │
 └─────────────────────┬───────────────────────────────────────────┘
-                      │ Inject reader scripts
+                      │
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Content Scripts (Reader)                      │
+│                Chrome Side Panel (reader/)                       │
 ├─────────────────────────────────────────────────────────────────┤
 │  reader/                                                         │
-│  ├── readerPanel.js      # Panel UI rendering & management       │
-│  ├── textExtractor.js    # Extract & format page content         │
+│  ├── reader.html         # Side panel HTML structure             │
+│  ├── reader.js           # Main entry, initializes modules       │
+│  ├── reader.css          # Side panel styles                     │
 │  ├── ttsEngine.js        # Orchestrates reading flow             │
 │  ├── ttsApiClient.js     # OpenAI TTS API wrapper                │
-│  ├── audioPlayer.js      # Audio playback & queue management     │
-│  └── readerPanel.css     # Panel styles                          │
+│  └── audioPlayer.js      # Audio playback & queue management     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Module Responsibilities
+---
+
+## Module Responsibilities
 
 | Module | Responsibility |
 |--------|----------------|
-| `readerPanel.js` | Creates/destroys the side panel, renders HTML content, handles UI interactions (play/pause/stop), shows progress |
-| `textExtractor.js` | Uses Readability to extract page content, splits into paragraphs, wraps each in `<div id="p-{n}">`, calculates reading time |
-| `ttsEngine.js` | Coordinates the reading flow: iterates through paragraphs, manages state (playing/paused/stopped), handles paragraph transitions |
-| `ttsApiClient.js` | Handles OpenAI TTS API calls, manages streaming responses, handles errors and retries |
-| `audioPlayer.js` | Web Audio API wrapper, plays audio chunks, manages playback state, emits events on completion |
-
----
-
-## Implementation Steps
-
-### Phase 1: Panel UI & Text Extraction
-
-#### Step 1.1: Create Reader Panel Module (`reader/readerPanel.js`)
-
-**Responsibilities:**
-- Create a fixed side panel (right side, ~400px width)
-- Panel structure:
-  ```html
-  <div id="reader-panel">
-    <div class="reader-header">
-      <h3>Reader</h3>
-      <div class="reader-controls">
-        <button id="reader-play-btn">▶ Play</button>
-        <button id="reader-pause-btn" disabled>⏸ Pause</button>
-        <button id="reader-stop-btn" disabled>⏹ Stop</button>
-        <select id="reader-voice-select">...</select>
-        <input type="range" id="reader-speed" min="0.5" max="2" step="0.25" value="1">
-      </div>
-      <div class="reader-info">
-        <span id="reader-time-estimate">Est. reading time: --:--</span>
-        <span id="reader-progress">0 / 0 paragraphs</span>
-      </div>
-      <button id="reader-close-btn">✕</button>
-    </div>
-    <div class="reader-content" id="reader-content">
-      <!-- Paragraphs rendered here -->
-    </div>
-  </div>
-  ```
-- Methods:
-  - `open()` - Show panel with animation
-  - `close()` - Hide and cleanup
-  - `renderContent(paragraphs)` - Render paragraph divs
-  - `highlightParagraph(id)` - Add highlight class, scroll into view
-  - `updateProgress(current, total)` - Update progress display
-  - `setPlaybackState(state)` - Update button states (idle/playing/paused)
-
-#### Step 1.2: Create Text Extractor Module (`reader/textExtractor.js`)
-
-**Responsibilities:**
-- Extract clean text using Readability (already available in the project)
-- Split content into paragraphs (by double newlines, `<p>` tags, etc.)
-- Return structured data:
-  ```javascript
-  {
-    title: "Article Title",
-    paragraphs: [
-      { id: "p-0", text: "First paragraph...", charCount: 150 },
-      { id: "p-1", text: "Second paragraph...", charCount: 200 },
-      // ...
-    ],
-    totalCharCount: 5000,
-    estimatedReadingTime: "5:30" // Based on ~150 words/min or TTS speed
-  }
-  ```
-- Methods:
-  - `extractContent()` - Main extraction function
-  - `splitIntoParagraphs(text)` - Split and filter empty paragraphs
-  - `calculateReadingTime(charCount, speed)` - Estimate TTS duration
-
-#### Step 1.3: Create Panel Styles (`reader/readerPanel.css`)
-
-- Fixed position panel on right side
-- Smooth slide-in animation
-- Paragraph styling with hover states
-- Current paragraph highlight (e.g., light blue background)
-- Responsive controls
-- Scrollable content area
-
-#### Step 1.4: Update Popup UI (`popup.html`, `popup.js`)
-
-- Add "Read" button next to "Summarize"
-- On click, send `OPEN_READER` message to background script
-
-#### Step 1.5: Update Background Script (`background.js`)
-
-- Handle `OPEN_READER` message
-- Inject reader content scripts into active tab
-- Handle `GET_TTS_CONFIG` message to provide API key
-
----
-
-### Phase 2: Add Playback Controls
-
-#### Step 2.1: Create Audio Player Module (`reader/audioPlayer.js`)
-
-**Responsibilities:**
-- Manage Web Audio API context
-- Play audio blobs/arraybuffers
-- Handle playback events
-- Methods:
-  - `play(audioData)` - Play audio data, return Promise that resolves on completion
-  - `pause()` - Pause current playback
-  - `resume()` - Resume paused playback
-  - `stop()` - Stop and reset
-  - `setVolume(level)` - Volume control (0-1)
-  - Event callbacks: `onEnded`, `onError`
-
-#### Step 2.2: Wire Up Panel Controls
-
-- Connect Play/Pause/Stop buttons to TTS engine
-- Voice selector populated with available voices
-- Speed slider updates TTS speed parameter
-- Close button properly cleans up resources
-
----
-
-### Phase 3: TTS API Integration
-
-#### Step 3.1: Create TTS API Client (`reader/ttsApiClient.js`)
-
-**Responsibilities:**
-- Make requests to OpenAI TTS API
-- Handle streaming responses
-- Error handling and rate limiting
-
-```javascript
-class TTSApiClient {
-  constructor(apiKey) {
-    this.apiKey = apiKey;
-    this.baseUrl = 'https://api.openai.com/v1/audio/speech';
-  }
-
-  async synthesize(text, options = {}) {
-    const {
-      model = 'tts-1',
-      voice = 'alloy',
-      speed = 1.0,
-      responseFormat = 'mp3'
-    } = options;
-
-    const response = await fetch(this.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        input: text,
-        voice,
-        speed,
-        response_format: responseFormat
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`TTS API error: ${response.status}`);
-    }
-
-    // Return audio as ArrayBuffer for Web Audio API
-    return await response.arrayBuffer();
-  }
-}
-```
-
-**Notes:**
-- TTS-1 has a 4096 character limit per request
-- For paragraphs exceeding this, split into smaller chunks
-- Consider prefetching next paragraph while current is playing
-
-#### Step 3.2: Create TTS Engine (`reader/ttsEngine.js`)
-
-**Responsibilities:**
-- Coordinate reading flow
-- Manage reading state
-- Handle paragraph transitions
-
-```javascript
-class TTSEngine {
-  constructor(apiClient, audioPlayer, panel) {
-    this.apiClient = apiClient;
-    this.audioPlayer = audioPlayer;
-    this.panel = panel;
-    this.paragraphs = [];
-    this.currentIndex = 0;
-    this.state = 'idle'; // idle, playing, paused
-    this.options = { voice: 'alloy', speed: 1.0 };
-  }
-
-  async loadContent(paragraphs) {
-    this.paragraphs = paragraphs;
-    this.currentIndex = 0;
-  }
-
-  async play() {
-    if (this.state === 'paused') {
-      this.audioPlayer.resume();
-      this.state = 'playing';
-      return;
-    }
-
-    this.state = 'playing';
-    await this.readFromCurrent();
-  }
-
-  async readFromCurrent() {
-    while (this.currentIndex < this.paragraphs.length && this.state === 'playing') {
-      const paragraph = this.paragraphs[this.currentIndex];
-
-      // Highlight current paragraph in panel
-      this.panel.highlightParagraph(paragraph.id);
-      this.panel.updateProgress(this.currentIndex + 1, this.paragraphs.length);
-
-      try {
-        // Synthesize audio for current paragraph
-        const audioData = await this.apiClient.synthesize(
-          paragraph.text,
-          this.options
-        );
-
-        // Play and wait for completion
-        await this.audioPlayer.play(audioData);
-
-        this.currentIndex++;
-      } catch (error) {
-        console.error('TTS error:', error);
-        this.state = 'idle';
-        throw error;
-      }
-    }
-
-    if (this.currentIndex >= this.paragraphs.length) {
-      this.state = 'idle';
-      this.currentIndex = 0;
-    }
-  }
-
-  pause() {
-    this.audioPlayer.pause();
-    this.state = 'paused';
-  }
-
-  stop() {
-    this.audioPlayer.stop();
-    this.state = 'idle';
-    this.currentIndex = 0;
-  }
-
-  setVoice(voice) {
-    this.options.voice = voice;
-  }
-
-  setSpeed(speed) {
-    this.options.speed = speed;
-  }
-}
-```
-
----
-
-### Phase 4: Polish & Enhancements
-
-#### Step 4.1: Prefetching (Performance Optimization)
-
-- While playing paragraph N, prefetch audio for paragraph N+1
-- Store in a small buffer (1-2 paragraphs ahead)
-- Reduces perceived latency between paragraphs
-
-#### Step 4.2: Progress Persistence
-
-- Save reading position to localStorage
-- Option to resume from where user left off
-
-#### Step 4.3: Error Handling
-
-- Handle API errors gracefully (rate limits, network issues)
-- Show user-friendly error messages
-- Retry logic for transient failures
-
-#### Step 4.4: Accessibility
-
-- Keyboard shortcuts (Space for play/pause, Escape to close)
-- ARIA labels for screen readers
+| `reader.html` | Side panel HTML structure with controls and content area |
+| `reader.js` | Main entry point, initializes modules, handles UI interactions, renders paragraphs |
+| `reader.css` | Side panel styling, paragraph highlights, controls |
+| `ttsEngine.js` | Coordinates reading flow: iterates through paragraphs, manages state (playing/paused/stopped), handles paragraph transitions |
+| `ttsApiClient.js` | Handles OpenAI TTS API calls, returns audio as ArrayBuffer, handles errors |
+| `audioPlayer.js` | Plays audio blobs via HTML5 Audio element, manages playback state, emits events on completion |
 
 ---
 
 ## File Structure
 
 ```
-chrome-ai-extension/
-├── manifest.json              # Add reader scripts to web_accessible_resources
-├── background.js              # Add OPEN_READER, GET_TTS_CONFIG handlers
+ai-ext/
+├── manifest.json              # Add side_panel + sidePanel permission
+├── background.js              # Add OPEN_READER handler, text extraction
 ├── popup.html                 # Add "Read" button
 ├── popup.js                   # Handle "Read" button click
 ├── reader/
-│   ├── index.js               # Main entry point, initializes modules
-│   ├── readerPanel.js         # Panel UI component
-│   ├── readerPanel.html       # Panel HTML template
-│   ├── readerPanel.css        # Panel styles
-│   ├── textExtractor.js       # Content extraction
-│   ├── ttsEngine.js           # Reading orchestration
-│   ├── ttsApiClient.js        # OpenAI TTS API wrapper
-│   └── audioPlayer.js         # Audio playback
-└── style/
-    └── ... (existing styles)
+│   ├── reader.html            # Side panel HTML (loaded by Chrome)
+│   ├── reader.js              # Main entry point (ES module)
+│   ├── reader.css             # Side panel styles
+│   ├── ttsEngine.js           # Reading orchestration (ES module)
+│   ├── ttsApiClient.js        # OpenAI TTS API wrapper (ES module)
+│   └── audioPlayer.js         # Audio playback (ES module)
+├── content.js                 # Existing (word helper)
+└── ... (existing files)
 ```
 
 ---
 
-## Manifest.json Updates
+## Implementation Steps
 
-```json
-{
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "reader/*",
-        "summary.html",
-        "content.html",
-        "style/*",
-        "lib/*"
-      ],
-      "matches": ["<all_urls>"]
-    }
-  ]
-}
-```
+### Phase 1: Side Panel Setup & Text Extraction
+
+#### Step 1.1: Update Manifest (`manifest.json`)
+
+- Add `side_panel.default_path` pointing to `reader/reader.html`
+- Add `sidePanel` to the permissions array
+
+#### Step 1.2: Create Side Panel HTML (`reader/reader.html`)
+
+Structure:
+- Header with title and reading info (time estimate, progress)
+- Controls section with:
+  - Play/Pause/Stop/Skip buttons
+  - Voice selector dropdown (all TTS-1 voices)
+  - Speed slider (0.5x to 2x, step 0.25)
+- Content area for rendered paragraphs
+  - Each paragraph has a "Play from here" button (visible on hover or always visible)
+- Load reader.js as ES module
+
+#### Step 1.3: Create Side Panel Styles (`reader/reader.css`)
+
+- Full-height flexbox layout
+- Header and controls with border separators
+- Control buttons with hover/disabled states
+- Paragraph styling:
+  - Default state with subtle styling
+  - `.current` class: blue background, left border highlight
+  - `.completed` class: dimmed text
+  - Hover state for interactivity
+  - "Play from here" button: small icon button, visible on hover or inline
+- Placeholder and error message styles
+
+#### Step 1.4: Update Popup UI (`popup.html`)
+
+- Wrap buttons in a `.button-group` container
+- Add "Read" button next to existing "Summarize" button
+
+#### Step 1.5: Update Popup Script (`popup.js`)
+
+- Add click handler for "Read" button
+- Send `OPEN_READER` message to background script
+- Close popup after sending message
+
+#### Step 1.6: Update Background Script (`background.js`)
+
+Add:
+- `readerStore` object to hold extracted content
+- `OPEN_READER` message handler that:
+  1. Gets active tab
+  2. Executes script to extract content using Readability
+  3. Splits text into paragraphs (by double newlines)
+  4. Creates paragraph objects with `id`, `text`, `charCount`
+  5. Stores in `readerStore`
+  6. Opens side panel via `chrome.sidePanel.open()`
+- `GET_READER_CONTENT` message handler that returns stored content
+
+---
+
+### Phase 2: Side Panel Core Logic
+
+#### Step 2.1: Create Main Reader Module (`reader/reader.js`)
+
+Class `ReaderPanel` with:
+
+**Properties:**
+- `content` - extracted page content
+- `ttsEngine` - TTS engine instance
+- `elements` - cached DOM element references
+
+**Methods:**
+- `init()` - initialize panel (cache elements, bind events, load content, init TTS)
+- `cacheElements()` - store references to DOM elements
+- `bindEvents()` - attach event listeners to controls and paragraph "play from here" buttons
+- `loadContent()` - request content from background via message
+- `initTTS()` - get API key from storage, create TTSApiClient, AudioPlayer, TTSEngine
+- `renderContent()` - render paragraphs as divs with IDs, data-index attributes, and "play from here" buttons
+- `highlightParagraph(index)` - add `.current` class, scroll into view
+- `markParagraphCompleted(index)` - add `.completed` class
+- `updateProgress(current, total)` - update progress display
+- `updateTimeEstimate()` - calculate and display estimated reading time
+- `updateControlsState(state)` - enable/disable buttons based on state
+- `play()`, `pause()`, `stop()`, `skip()` - delegate to TTS engine
+- `playFromParagraph(index)` - stop current playback and start from specified paragraph
+- `setVoice(voice)`, `setSpeed(speed)` - update TTS options
+- `showPlaceholder(message)`, `showError(message)` - display messages
+- `escapeHtml(text)` - sanitize text for HTML rendering
+
+---
+
+### Phase 3: TTS Engine & API Integration
+
+#### Step 3.1: Create Audio Player Module (`reader/audioPlayer.js`)
+
+Class `AudioPlayer` with:
+
+**Properties:**
+- `audio` - HTML5 Audio element instance
+- `isPlaying` - current playback state
+
+**Methods:**
+- `play(audioData)` - create Blob from ArrayBuffer, create object URL, play audio, return Promise that resolves on `ended` event
+- `pause()` - pause current audio
+- `resume()` - resume paused audio
+- `stop()` - stop and reset audio element
+- `setVolume(level)` - set volume (0-1)
+
+**Behavior:**
+- Clean up object URLs after playback to prevent memory leaks
+- Handle playback errors gracefully
+
+#### Step 3.2: Create TTS API Client (`reader/ttsApiClient.js`)
+
+Class `TTSApiClient` with:
+
+**Constructor:**
+- Takes API key as parameter
+- Stores base URL for TTS endpoint
+
+**Methods:**
+- `synthesize(text, options)` - make POST request to OpenAI TTS API:
+  - Parameters: model, input, voice, speed, response_format
+  - Return ArrayBuffer of audio data
+  - Throw error on API failure with status and message
+- `splitTextIntoChunks(text, maxLength)` - split text longer than 4096 chars:
+  - Find sentence boundaries (`. `) or word boundaries as break points
+  - Return array of chunks
+
+#### Step 3.3: Create TTS Engine (`reader/ttsEngine.js`)
+
+Class `TTSEngine` with:
+
+**Constructor:**
+- Takes apiClient, audioPlayer, callbacks object
+- Callbacks: `onParagraphStart`, `onParagraphEnd`, `onProgress`, `onStateChange`, `onError`
+
+**Properties:**
+- `paragraphs` - array of paragraph objects
+- `currentIndex` - current reading position
+- `state` - `'idle'` | `'playing'` | `'paused'`
+- `options` - voice and speed settings
+- `prefetchedAudio` - buffer for next paragraph's audio
+- `prefetchIndex` - index of prefetched paragraph
+
+**Methods:**
+- `loadContent(paragraphs)` - store paragraphs, reset state
+- `play()` - if paused, resume; otherwise start reading from current position
+- `playFrom(index)` - stop current playback, set currentIndex to specified index, start playing
+- `readFromCurrent()` - loop through paragraphs:
+  1. Notify paragraph start via callback
+  2. Use prefetched audio or synthesize new
+  3. Start prefetching next paragraph (non-blocking)
+  4. Play audio and wait for completion
+  5. Notify paragraph end, increment index
+  6. Handle errors, update state
+- `synthesizeParagraph(text)` - handle chunking for long paragraphs, concatenate audio buffers
+- `concatenateAudioBuffers(buffers)` - combine multiple ArrayBuffers into one
+- `prefetchNext()` - synthesize next paragraph in background
+- `pause()` - pause audio, update state
+- `skip()` - stop current paragraph audio, increment index, continue playing from next paragraph
+- `stop()` - stop audio, reset index and state, clear prefetch
+- `setVoice(voice)`, `setSpeed(speed)` - update options, clear prefetch cache
+
+---
+
+### Phase 4: Polish & Enhancements
+
+#### Step 4.1: Update Popup Styles (`style/popup.css`)
+
+- Add `.button-group` styling for horizontal button layout
+- Ensure consistent button sizing
+
+#### Step 4.2: Error Handling
+
+- Display user-friendly error for missing API key
+- Handle network errors with clear messages
+- Handle rate limiting gracefully
+
+#### Step 4.3: State Persistence
+
+- Save voice preference to chrome.storage
+- Save speed preference to chrome.storage
+- Load saved preferences on panel init
+
+#### Step 4.4: Accessibility
+
+- Add keyboard shortcut: Space for play/pause
+- Add ARIA labels to controls
+- Ensure focus management
 
 ---
 
@@ -389,9 +317,29 @@ chrome-ai-extension/
 
 | Message Type | Direction | Payload | Purpose |
 |--------------|-----------|---------|---------|
-| `OPEN_READER` | popup → background | `{}` | Request to open reader panel |
-| `GET_TTS_CONFIG` | content → background | `{}` | Get API key for TTS |
-| `TTS_CONFIG` | background → content | `{ apiKey, voice, speed }` | Return TTS configuration |
+| `OPEN_READER` | popup → background | `{}` | Request to extract content and open side panel |
+| `GET_READER_CONTENT` | sidepanel → background | `{}` | Retrieve extracted content |
+
+---
+
+## Data Structures
+
+### Extracted Content (stored in `readerStore.content`)
+
+```
+{
+  title: string,           // Page title
+  paragraphs: [            // Array of paragraph objects
+    {
+      id: string,          // "p-0", "p-1", etc.
+      text: string,        // Paragraph text content
+      charCount: number    // Character count for time estimation
+    }
+  ],
+  totalCharCount: number,  // Sum of all paragraph char counts
+  url: string              // Source page URL
+}
+```
 
 ---
 
@@ -400,54 +348,59 @@ chrome-ai-extension/
 Formula based on TTS-1 characteristics:
 - Average TTS speed: ~150 words per minute at speed 1.0
 - Average word length: ~5 characters
-- Calculation: `(totalChars / 5) / 150 * (1 / speed)` minutes
+- Calculation: `(totalChars / 5) / (150 * speed)` minutes
 
 ---
 
 ## Testing Checklist
 
-- [ ] Panel opens and closes correctly
-- [ ] Text extraction works on various page types
-- [ ] Paragraphs are correctly split and rendered
+- [x] Side panel opens correctly from popup "Read" button
+- [x] Text extraction works on various page types (articles, blogs, docs)
+- [x] Paragraphs render correctly in side panel with proper IDs
 - [ ] Play/Pause/Stop controls work as expected
+- [ ] Skip button skips current paragraph and continues to next
+- [ ] "Play from here" button on each paragraph starts reading from that paragraph
 - [ ] Current paragraph is highlighted during playback
 - [ ] Panel scrolls to show current paragraph
-- [ ] Voice and speed settings are applied
-- [ ] Reading time estimate is accurate
-- [ ] Error handling works (no API key, network error, etc.)
-- [ ] Panel doesn't interfere with page functionality
-- [ ] Works across different websites
+- [ ] Voice selection changes the TTS voice
+- [ ] Speed slider adjusts playback speed
+- [ ] Reading time estimate updates with speed changes
+- [ ] Error handling works (no API key, network error, rate limit)
+- [ ] Prefetching reduces latency between paragraphs
+- [ ] Long paragraphs (>4096 chars) are properly chunked
 
 ---
 
 ## Implementation Order Summary
 
-1. **Phase 1: Panel UI & Text Extraction**
-   - 1.1 Create `readerPanel.js` with basic UI
-   - 1.2 Create `textExtractor.js` for content extraction
-   - 1.3 Create `readerPanel.css` for styling
-   - 1.4 Update `popup.html/js` with "Read" button
-   - 1.5 Update `background.js` to handle messages & inject scripts
+1. **Phase 1: Side Panel Setup & Text Extraction**
+   - 1.1 Update manifest.json with side_panel config
+   - 1.2 Create reader/reader.html
+   - 1.3 Create reader/reader.css
+   - 1.4 Update popup.html with "Read" button
+   - 1.5 Update popup.js with read handler
+   - 1.6 Update background.js with OPEN_READER handler
 
-2. **Phase 2: Playback Controls**
-   - 2.1 Create `audioPlayer.js` for audio playback
-   - 2.2 Wire up panel controls to engine
+2. **Phase 2: Side Panel Core Logic**
+   - 2.1 Create reader/reader.js (main entry point)
 
-3. **Phase 3: TTS API Integration**
-   - 3.1 Create `ttsApiClient.js` for API calls
-   - 3.2 Create `ttsEngine.js` for orchestration
+3. **Phase 3: TTS Engine & API Integration**
+   - 3.1 Create reader/audioPlayer.js
+   - 3.2 Create reader/ttsApiClient.js
+   - 3.3 Create reader/ttsEngine.js
 
 4. **Phase 4: Polish & Enhancements**
-   - 4.1 Add prefetching
-   - 4.2 Progress persistence
-   - 4.3 Error handling
-   - 4.4 Accessibility features
+   - 4.1 Update popup styles
+   - 4.2 Error handling
+   - 4.3 State persistence
+   - 4.4 Accessibility
 
 ---
 
 ## Notes
 
-- **4096 character limit**: TTS-1 has a max input of 4096 chars. Long paragraphs need chunking.
-- **Rate limiting**: Reuse existing `apiRateLimiter` from background.js or create similar in content script.
+- **4096 character limit**: TTS-1 has a max input of 4096 chars. Long paragraphs are automatically chunked.
 - **Voice options for TTS-1**: `alloy`, `ash`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`
-- **Best format for streaming**: `mp3` (good compression, widely supported) or `wav` (fastest, no decode overhead)
+- **Prefetching**: Next paragraph is prefetched while current is playing to reduce latency.
+- **ES Modules**: All reader modules use ES module syntax (`import`/`export`).
+- **Content extraction**: Uses Readability library (already in project) via `chrome.scripting.executeScript()`.

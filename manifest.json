@@ -10,6 +10,9 @@
       "38": "icons/icon38.png"
     }
   },
+  "side_panel": {
+    "default_path": "reader/reader.html"
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -49,7 +52,8 @@
     "activeTab",
     "scripting",
     "storage",
-    "tabs"
+    "tabs",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://api.openai.com/*"

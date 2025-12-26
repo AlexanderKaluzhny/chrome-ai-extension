@@ -30,6 +30,10 @@ const summaryStore = {
   currentSummary: null,
 };
 
+const readerStore = {
+  content: null,
+};
+
 // Debug logging function
 function debug(...args) {
   if (CONFIG.DEBUG_MODE) {
@@ -63,7 +67,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ summary: summaryStore.currentSummary });
     return true;
   }
-  
+
+  if (msg.type === 'GET_READER_CONTENT') {
+    sendResponse({ content: readerStore.content });
+    return true;
+  }
+
+  if (msg.type === 'EXTRACT_CONTENT') {
+    extractContentForReader()
+      .then(content => sendResponse({ content }))
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
+  }
+
   return false; // No async response expected for other message types
 });
 
@@ -250,5 +266,155 @@ async function lookupWord(word, context, customPrompt) {
     }
     const data = await response.json();
     return data.choices[0].message.content.trim();
+  }
+}
+
+// Extract content for the reader panel
+async function extractContentForReader() {
+  try {
+    // Get the active tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      throw new Error('No active tab found');
+    }
+
+    debug('Extracting content for reader from tab:', tab.title);
+
+    // Inject Readability library first, then extract content
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['/lib/Readability.min.js'],
+    });
+
+    // Extract page content
+    const scriptResults = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: extractPageContent,
+    });
+
+    if (!scriptResults || scriptResults.length === 0) {
+      throw new Error('Failed to extract content');
+    }
+
+    const { result } = scriptResults[0];
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
+    debug('Extracted content:', result.paragraphs.length, 'paragraphs,', result.totalCharCount, 'chars');
+
+    // Store content for side panel
+    readerStore.content = {
+      title: result.title,
+      paragraphs: result.paragraphs,
+      totalCharCount: result.totalCharCount,
+      url: tab.url,
+    };
+
+    return readerStore.content;
+
+  } catch (error) {
+    debug('Error in extractContentForReader:', error);
+    throw error;
+  }
+}
+
+// Function to be injected for content extraction
+function extractPageContent() {
+  try {
+    let title = document.title || 'Untitled';
+    let paragraphs = [];
+
+    // Try Readability if available - use its HTML content to preserve structure
+    if (typeof Readability !== 'undefined') {
+      try {
+        const article = new Readability(document.cloneNode(true)).parse();
+        if (article) {
+          title = article.title || title;
+
+          // Parse the HTML content to extract paragraphs properly
+          if (article.content) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(article.content, 'text/html');
+
+            // Get all block-level text elements
+            const blockElements = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
+
+            for (const el of blockElements) {
+              const text = el.textContent?.trim();
+              if (text && text.length > 0) {
+                paragraphs.push(text);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Readability failed:', e);
+      }
+    }
+
+    // Fallback: extract from DOM directly if Readability didn't work
+    if (paragraphs.length === 0) {
+      // Try to find main content area
+      const mainContent = document.querySelector('article, main, [role="main"], .content, #content')
+                         || document.body;
+
+      const blockElements = mainContent.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
+
+      for (const el of blockElements) {
+        const text = el.textContent?.trim();
+        if (text && text.length > 0) {
+          paragraphs.push(text);
+        }
+      }
+    }
+
+    // Last resort: split body text by newlines
+    if (paragraphs.length === 0) {
+      const text = document.body.innerText || '';
+      paragraphs = text
+        .split(/\n\s*\n/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0);
+    }
+
+    // Split any very long paragraphs (>2000 chars) on sentence boundaries
+    const finalParagraphs = [];
+    for (const para of paragraphs) {
+      if (para.length > 2000) {
+        const sentences = para.split(/(?<=\.)\s+(?=[A-Z])/);
+        let chunk = '';
+        for (const sentence of sentences) {
+          if (chunk.length + sentence.length > 1500 && chunk.length > 0) {
+            finalParagraphs.push(chunk.trim());
+            chunk = sentence;
+          } else {
+            chunk += (chunk ? ' ' : '') + sentence;
+          }
+        }
+        if (chunk.trim()) {
+          finalParagraphs.push(chunk.trim());
+        }
+      } else {
+        finalParagraphs.push(para);
+      }
+    }
+
+    // Create paragraph objects with IDs
+    const result = finalParagraphs.map((text, index) => ({
+      id: `p-${index}`,
+      text: text,
+      charCount: text.length,
+    }));
+
+    const totalCharCount = result.reduce((sum, p) => sum + p.charCount, 0);
+
+    return {
+      title,
+      paragraphs: result,
+      totalCharCount,
+    };
+  } catch (error) {
+    return { error: error.message };
   }
 }
