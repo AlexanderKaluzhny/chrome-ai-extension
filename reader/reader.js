@@ -3,12 +3,14 @@
 import AudioPlayer from './audioPlayer.js';
 import TTSApiClient from './ttsApiClient.js';
 import TTSEngine from './ttsEngine.js';
+import { withMethodLogging } from './debug.js';
 
 class ReaderPanel {
   constructor() {
     this.content = null;
     this.elements = {};
     this.ttsEngine = null;
+    withMethodLogging(this, 'ReaderPanel');
     this.init();
   }
 

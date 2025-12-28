@@ -1,5 +1,7 @@
 // reader/ttsEngine.js - Orchestrates reading flow and manages state
 
+import { withMethodLogging } from './debug.js';
+
 export default class TTSEngine {
   /**
    * @param {TTSApiClient} apiClient - TTS API client instance
@@ -26,9 +28,7 @@ export default class TTSEngine {
 
     this.shouldStop = false;
 
-    console.log({
-      this: this,
-    });
+    withMethodLogging(this, 'TTSEngine');
   }
 
   /**

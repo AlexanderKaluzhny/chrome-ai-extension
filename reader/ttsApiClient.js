@@ -1,9 +1,12 @@
 // reader/ttsApiClient.js - OpenAI TTS API wrapper
 
+import { withMethodLogging } from './debug.js';
+
 export default class TTSApiClient {
   constructor(apiKey) {
     this.apiKey = apiKey;
     this.baseUrl = 'https://api.openai.com/v1/audio/speech';
+    withMethodLogging(this, 'TTSApiClient');
   }
 
   /**

@@ -357,14 +357,15 @@ Formula based on TTS-1 characteristics:
 - [x] Side panel opens correctly from popup "Read" button
 - [x] Text extraction works on various page types (articles, blogs, docs)
 - [x] Paragraphs render correctly in side panel with proper IDs
-- [ ] Play/Pause/Stop controls work as expected
-- [ ] Skip button skips current paragraph and continues to next
-- [ ] "Play from here" button on each paragraph starts reading from that paragraph
-- [ ] Current paragraph is highlighted during playback
-- [ ] Panel scrolls to show current paragraph
-- [ ] Voice selection changes the TTS voice
-- [ ] Speed slider adjusts playback speed
-- [ ] Reading time estimate updates with speed changes
+- [x] Play/Pause/Stop controls work as expected
+- [x] Skip button skips current paragraph and continues to next
+- [x] Current paragraph is highlighted during playback
+- [x] Panel scrolls to show current paragraph
+- [x] Voice selection changes the TTS voice
+- [x] Speed slider adjusts playback speed
+- [x] Reading time estimate updates with speed changes
+- [x] Voice/Speed preferences are persisted to storage
+- [~] "Play from here" (click paragraph) - **HAS BUG: race condition, see PROBLEM-STATE-MACHINE.md**
 - [ ] Error handling works (no API key, network error, rate limit)
 - [ ] Prefetching reduces latency between paragraphs
 - [ ] Long paragraphs (>4096 chars) are properly chunked
@@ -394,6 +395,31 @@ Formula based on TTS-1 characteristics:
    - 4.2 Error handling
    - 4.3 State persistence
    - 4.4 Accessibility
+
+---
+
+## Current Implementation Status
+
+**Last Updated:** 2025-12-28
+
+### Completed
+- Phase 1: Side Panel Setup & Text Extraction ✅
+- Phase 2: Side Panel Core Logic ✅
+- Phase 3: TTS Engine & API Integration ✅
+- Phase 4.1: Popup styles ✅
+- Phase 4.3: State persistence (voice/speed) ✅
+- Debug logging utility (`reader/debug.js`) ✅
+
+### In Progress
+- **Bug Fix:** Race condition in `playFrom()` - see `PROBLEM-STATE-MACHINE.md`
+
+### Not Started
+- Phase 4.2: Error handling improvements
+- Phase 4.4: Accessibility
+- Prefetching optimization
+
+### Additional Files Created
+- `reader/debug.js` - Generic method logging wrapper for debugging
 
 ---
 

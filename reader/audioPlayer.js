@@ -1,10 +1,13 @@
 // reader/audioPlayer.js - Audio playback using HTML5 Audio element
 
+import { withMethodLogging } from './debug.js';
+
 export default class AudioPlayer {
   constructor() {
     this.audio = new Audio();
     this.currentObjectUrl = null;
     this.isPlaying = false;
+    withMethodLogging(this, 'AudioPlayer');
   }
 
   /**
