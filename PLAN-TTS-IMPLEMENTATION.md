@@ -365,7 +365,7 @@ Formula based on TTS-1 characteristics:
 - [x] Speed slider adjusts playback speed
 - [x] Reading time estimate updates with speed changes
 - [x] Voice/Speed preferences are persisted to storage
-- [~] "Play from here" (click paragraph) - **HAS BUG: race condition, see PROBLEM-STATE-MACHINE.md**
+- [x] "Play from here" (click paragraph) - Fixed with Playlist state machine
 - [ ] Error handling works (no API key, network error, rate limit)
 - [ ] Prefetching reduces latency between paragraphs
 - [ ] Long paragraphs (>4096 chars) are properly chunked
@@ -400,7 +400,7 @@ Formula based on TTS-1 characteristics:
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-28
+**Last Updated:** 2025-12-29
 
 ### Completed
 - Phase 1: Side Panel Setup & Text Extraction ✅
@@ -408,18 +408,41 @@ Formula based on TTS-1 characteristics:
 - Phase 3: TTS Engine & API Integration ✅
 - Phase 4.1: Popup styles ✅
 - Phase 4.3: State persistence (voice/speed) ✅
-- Debug logging utility (`reader/debug.js`) ✅
 
-### In Progress
-- **Bug Fix:** Race condition in `playFrom()` - see `PROBLEM-STATE-MACHINE.md`
+### Bug Fixes Completed
+- **Race condition in `playFrom()`** - Fixed by introducing Playlist component with state machine
+- **Race condition in `skip()`** - Fixed by waiting for old loop to exit before advancing
+- **`audioPlayer.stop()` not resolving pending Promise** - Fixed by storing and calling pendingResolve
+
+### Architecture Improvements
+- **Playlist component** (`reader/playlist.js`) - Singleton that manages playback state:
+  - Owns: `paragraphs[]`, `currentIndex`, `state`
+  - State machine: `idle` → `playing` ↔ `paused` → `stopping` → `idle`
+  - Guards against race conditions with `loopExitPromise`
+  - See `PROBLEM-STATE-MACHINE.md` for detailed analysis
+
+- **TTSEngine refactored** - Now delegates state management to Playlist:
+  - Removed: `paragraphs`, `currentIndex`, `state`, `shouldStop`
+  - Uses `playlist.shouldContinue()` in loops
+  - Calls `playlist.notifyLoopExit()` when loop exits
+
+- **Enhanced debug logging** (`reader/debug.js`):
+  - Call depth indentation showing nested calls
+  - Entry (`→`) and exit (`←`) markers
+  - Arguments and return values formatted
+  - Async-aware (handles Promises correctly)
 
 ### Not Started
 - Phase 4.2: Error handling improvements
 - Phase 4.4: Accessibility
 - Prefetching optimization
 
-### Additional Files Created
-- `reader/debug.js` - Generic method logging wrapper for debugging
+### Files Created/Modified
+- `reader/playlist.js` - NEW: Singleton playlist with state machine
+- `reader/debug.js` - Enhanced with call depth, args, return values
+- `reader/ttsEngine.js` - Refactored to use Playlist
+- `reader/audioPlayer.js` - Fixed stop() to resolve pending play()
+- `PROBLEM-STATE-MACHINE.md` - Documents the race condition analysis
 
 ---
 

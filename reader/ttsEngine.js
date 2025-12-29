@@ -1,6 +1,7 @@
-// reader/ttsEngine.js - Orchestrates reading flow and manages state
+// reader/ttsEngine.js - Orchestrates reading flow using Playlist for state
 
 import { withMethodLogging } from './debug.js';
+import playlist from './playlist.js';
 
 export default class TTSEngine {
   /**
@@ -18,15 +19,17 @@ export default class TTSEngine {
     this.audioPlayer = audioPlayer;
     this.callbacks = callbacks;
 
-    this.paragraphs = [];
-    this.currentIndex = 0;
-    this.state = 'idle'; // 'idle' | 'playing' | 'paused'
     this.options = {
       voice: 'alloy',
       speed: 1.0,
     };
 
-    this.shouldStop = false;
+    // Register state change callback with playlist
+    playlist.onStateChange((state) => {
+      // Map 'stopping' to 'idle' for UI (UI doesn't need to know about stopping)
+      const uiState = state === 'stopping' ? 'idle' : state;
+      this.callbacks.onStateChange?.(uiState);
+    });
 
     withMethodLogging(this, 'TTSEngine');
   }
@@ -36,23 +39,25 @@ export default class TTSEngine {
    * @param {Array} paragraphs - Array of paragraph objects with { id, text, charCount }
    */
   loadContent(paragraphs) {
-    this.paragraphs = paragraphs;
-    this.currentIndex = 0;
-    this.setState('idle');
+    playlist.loadContent(paragraphs);
   }
 
   /**
    * Start or resume playback
    */
   async play() {
-    if (this.state === 'paused') {
+    const state = playlist.getState();
+
+    if (state === 'paused') {
       this.audioPlayer.resume();
-      this.setState('playing');
+      playlist.requestPlay();
       return;
     }
 
-    if (this.state === 'idle') {
-      await this.readFromCurrent();
+    if (state === 'idle') {
+      if (playlist.requestPlay()) {
+        await this.readFromCurrent();
+      }
     }
   }
 
@@ -61,54 +66,60 @@ export default class TTSEngine {
    * @param {number} index - Paragraph index to start from
    */
   async playFrom(index) {
-    this.stop();
-    this.currentIndex = index;
-    await this.readFromCurrent();
+    // Stop any current playback and wait for loop to exit
+    await this.stop();
+
+    // Jump to the specified index
+    playlist.goTo(index);
+
+    // Start playing
+    await this.play();
   }
 
   /**
    * Main reading loop - reads from current position through all paragraphs
    */
   async readFromCurrent() {
-    this.shouldStop = false;
-    this.setState('playing');
-
     try {
-      while (this.currentIndex < this.paragraphs.length && !this.shouldStop) {
-        const paragraph = this.paragraphs[this.currentIndex];
+      while (playlist.hasMore() && playlist.shouldContinue()) {
+        const paragraph = playlist.getCurrentParagraph();
+        const currentIndex = playlist.getCurrentIndex();
 
         // Notify paragraph start
-        this.callbacks.onParagraphStart?.(this.currentIndex);
+        this.callbacks.onParagraphStart?.(currentIndex);
 
         // Synthesize audio for this paragraph
         const audioData = await this.synthesizeParagraph(paragraph.text);
 
         // Check if we should stop (might have been called during synthesis)
-        if (this.shouldStop) break;
+        if (!playlist.shouldContinue()) break;
 
         // Play the audio
         await this.audioPlayer.play(audioData);
 
         // Check if we should stop (might have been called during playback)
-        if (this.shouldStop) break;
+        if (!playlist.shouldContinue()) break;
 
         // Notify paragraph end
-        this.callbacks.onParagraphEnd?.(this.currentIndex);
+        this.callbacks.onParagraphEnd?.(currentIndex);
 
         // Move to next paragraph
-        this.currentIndex++;
+        playlist.advance();
 
         // Update progress
-        this.callbacks.onProgress?.(this.currentIndex, this.paragraphs.length);
+        this.callbacks.onProgress?.(playlist.getCurrentIndex(), playlist.getTotal());
       }
 
-      // Reading complete
-      if (!this.shouldStop) {
-        this.setState('idle');
+      // Reading complete - only set idle if we finished naturally (not stopped)
+      if (playlist.shouldContinue()) {
+        playlist.requestStop();
       }
     } catch (error) {
       this.callbacks.onError?.(error);
-      this.setState('idle');
+      playlist.requestStop();
+    } finally {
+      // Always notify that loop has exited
+      playlist.notifyLoopExit();
     }
   }
 
@@ -127,7 +138,7 @@ export default class TTSEngine {
     // For multiple chunks, synthesize each and concatenate
     const audioBuffers = [];
     for (const chunk of chunks) {
-      if (this.shouldStop) break;
+      if (!playlist.shouldContinue()) break;
       const audioData = await this.apiClient.synthesize(chunk, this.options);
       audioBuffers.push(audioData);
     }
@@ -157,44 +168,49 @@ export default class TTSEngine {
    * Pause playback
    */
   pause() {
-    if (this.state === 'playing') {
+    if (playlist.getState() === 'playing') {
       this.audioPlayer.pause();
-      this.setState('paused');
+      playlist.requestPause();
     }
   }
 
   /**
    * Stop playback and reset to beginning
+   * @returns {Promise} Resolves when fully stopped
    */
-  stop() {
-    this.shouldStop = true;
+  async stop() {
     this.audioPlayer.stop();
-    this.currentIndex = 0;
-    this.setState('idle');
-    this.callbacks.onProgress?.(0, this.paragraphs.length);
+    await playlist.requestStop();
+    this.callbacks.onProgress?.(0, playlist.getTotal());
   }
 
   /**
    * Skip current paragraph and continue to next
    */
   async skip() {
-    if (this.state !== 'playing' && this.state !== 'paused') return;
+    const state = playlist.getState();
+    if (state !== 'playing' && state !== 'paused') return;
 
-    // Stop current audio
+    // Save current and next index before stopping (stop resets index to 0)
+    const currentIndex = playlist.getCurrentIndex();
+    const nextIndex = currentIndex + 1;
+    const total = playlist.getTotal();
+
+    // Mark current as completed
+    this.callbacks.onParagraphEnd?.(currentIndex);
+
+    // Stop current playback and wait for old loop to exit
     this.audioPlayer.stop();
+    await playlist.requestStop();
 
-    // Mark current as completed and move to next
-    this.callbacks.onParagraphEnd?.(this.currentIndex);
-    this.currentIndex++;
-
-    if (this.currentIndex < this.paragraphs.length) {
-      this.callbacks.onProgress?.(this.currentIndex, this.paragraphs.length);
-      // Continue reading from next paragraph
-      await this.readFromCurrent();
+    if (nextIndex < total) {
+      // Go to next paragraph and start playing
+      playlist.goTo(nextIndex);
+      this.callbacks.onProgress?.(nextIndex, total);
+      await this.play();
     } else {
       // No more paragraphs
-      this.setState('idle');
-      this.callbacks.onProgress?.(this.currentIndex, this.paragraphs.length);
+      this.callbacks.onProgress?.(total, total);
     }
   }
 
@@ -212,14 +228,5 @@ export default class TTSEngine {
    */
   setSpeed(speed) {
     this.options.speed = speed;
-  }
-
-  /**
-   * Update state and notify via callback
-   * @param {string} state - New state
-   */
-  setState(state) {
-    this.state = state;
-    this.callbacks.onStateChange?.(state);
   }
 }

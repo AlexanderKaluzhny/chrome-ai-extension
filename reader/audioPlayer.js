@@ -7,16 +7,25 @@ export default class AudioPlayer {
     this.audio = new Audio();
     this.currentObjectUrl = null;
     this.isPlaying = false;
+
+    // Store resolve function to allow stop() to resolve pending play()
+    this.pendingResolve = null;
+    this.pendingReject = null;
+
     withMethodLogging(this, 'AudioPlayer');
   }
 
   /**
    * Play audio from ArrayBuffer data
    * @param {ArrayBuffer} audioData - Audio data as ArrayBuffer
-   * @returns {Promise} Resolves when audio finishes playing
+   * @returns {Promise} Resolves when audio finishes playing or is stopped
    */
   play(audioData) {
     return new Promise((resolve, reject) => {
+      // Store resolve/reject so stop() can use them
+      this.pendingResolve = resolve;
+      this.pendingReject = reject;
+
       // Cleanup previous object URL
       this.cleanup();
 
@@ -32,6 +41,8 @@ export default class AudioPlayer {
         this.isPlaying = false;
         this.audio.removeEventListener('ended', onEnded);
         this.audio.removeEventListener('error', onError);
+        this.pendingResolve = null;
+        this.pendingReject = null;
         resolve();
       };
 
@@ -40,6 +51,8 @@ export default class AudioPlayer {
         this.isPlaying = false;
         this.audio.removeEventListener('ended', onEnded);
         this.audio.removeEventListener('error', onError);
+        this.pendingResolve = null;
+        this.pendingReject = null;
         reject(new Error(`Audio playback error: ${e.message || 'Unknown error'}`));
       };
 
@@ -51,7 +64,11 @@ export default class AudioPlayer {
         .then(() => {
           this.isPlaying = true;
         })
-        .catch(reject);
+        .catch((err) => {
+          this.pendingResolve = null;
+          this.pendingReject = null;
+          reject(err);
+        });
     });
   }
 
@@ -80,11 +97,20 @@ export default class AudioPlayer {
 
   /**
    * Stop audio playback and reset
+   * Resolves any pending play() Promise
    */
   stop() {
     this.audio.pause();
     this.audio.currentTime = 0;
     this.isPlaying = false;
+
+    // Resolve pending play() Promise so the loop can exit
+    if (this.pendingResolve) {
+      this.pendingResolve();
+      this.pendingResolve = null;
+      this.pendingReject = null;
+    }
+
     this.cleanup();
   }
 
