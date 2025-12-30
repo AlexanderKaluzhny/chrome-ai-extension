@@ -80,6 +80,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'READ_FROM_HERE') {
+    handleReadFromHere(msg.paragraphIndex)
+      .then(result => sendResponse(result))
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
+  }
+
   return false; // No async response expected for other message types
 });
 
@@ -278,7 +285,6 @@ async function extractContentForReader() {
       throw new Error('No active tab found');
     }
 
-    debug('Extracting content for reader from tab:', tab.title);
 
     // Inject Readability library first, then extract content
     await chrome.scripting.executeScript({
@@ -301,7 +307,6 @@ async function extractContentForReader() {
       throw new Error(result.error);
     }
 
-    debug('Extracted content:', result.paragraphs.length, 'paragraphs,', result.totalCharCount, 'chars');
 
     // Store content for side panel
     readerStore.content = {
@@ -317,6 +322,12 @@ async function extractContentForReader() {
     debug('Error in extractContentForReader:', error);
     throw error;
   }
+}
+
+async function handleReadFromHere(paragraphIndex) {
+  // Notify reader panel to navigate to the paragraph
+  await chrome.runtime.sendMessage({ type: 'GO_TO_PARAGRAPH', paragraphIndex });
+  return { success: true, paragraphIndex };
 }
 
 // Function to be injected for content extraction

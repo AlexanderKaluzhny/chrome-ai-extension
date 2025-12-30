@@ -400,7 +400,7 @@ Formula based on TTS-1 characteristics:
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-29
+**Last Updated:** 2025-12-30
 
 ### Completed
 - Phase 1: Side Panel Setup & Text Extraction ✅
@@ -408,6 +408,7 @@ Formula based on TTS-1 characteristics:
 - Phase 3: TTS Engine & API Integration ✅
 - Phase 4.1: Popup styles ✅
 - Phase 4.3: State persistence (voice/speed) ✅
+- **Navigate in Reader feature** ✅
 
 ### Bug Fixes Completed
 - **Race condition in `playFrom()`** - Fixed by introducing Playlist component with state machine
@@ -438,6 +439,14 @@ Formula based on TTS-1 characteristics:
   - Invalidated on stop, playFrom, voice/speed change
   - Graceful degradation if prefetch fails
 
+- **Navigate in Reader** (`content.js`, `background.js`, `reader.js`):
+  - User selects text on page, clicks "Navigate in Reader" button in bubble
+  - Creates truncated HTML (removes all DOM nodes after clicked element)
+  - Runs Readability on truncated HTML, counts paragraphs
+  - Last paragraph index = target position in Reader panel
+  - No text matching needed - uses identical Readability processing
+  - See `READ-FROM-HERE-FEATURE.md` for detailed design (Solution D)
+
 ### Not Started
 - Phase 4.2: Error handling improvements
 - Phase 4.4: Accessibility
@@ -448,6 +457,9 @@ Formula based on TTS-1 characteristics:
 - `reader/ttsEngine.js` - Refactored to use Playlist
 - `reader/audioPlayer.js` - Fixed stop() to resolve pending play()
 - `PROBLEM-STATE-MACHINE.md` - Documents the race condition analysis
+- `content.js` - Added "Navigate in Reader" with truncated HTML logic
+- `content.html` - Added "Navigate in Reader" button to word bubble
+- `READ-FROM-HERE-FEATURE.md` - NEW: Documents the Navigate in Reader feature design
 
 ---
 

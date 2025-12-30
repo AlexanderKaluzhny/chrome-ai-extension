@@ -1,6 +1,6 @@
 // reader/debug.js - Debug utilities for method logging
 
-const DEBUG = true;
+const DEBUG = false;
 
 let callDepth = 0;
 

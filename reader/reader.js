@@ -3,6 +3,7 @@
 import AudioPlayer from './audioPlayer.js';
 import TTSApiClient from './ttsApiClient.js';
 import TTSEngine from './ttsEngine.js';
+import playlist from './playlist.js';
 import { withMethodLogging } from './debug.js';
 
 class ReaderPanel {
@@ -17,8 +18,19 @@ class ReaderPanel {
   async init() {
     this.cacheElements();
     this.bindEvents();
+    this.listenForMessages();
     await this.loadContent();
     await this.initTTS();
+  }
+
+  listenForMessages() {
+    chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg.type === 'GO_TO_PARAGRAPH' && typeof msg.paragraphIndex === 'number') {
+        this.goToParagraph(msg.paragraphIndex);
+        sendResponse({ success: true, paragraphIndex: msg.paragraphIndex });
+      }
+      return true;
+    });
   }
 
   cacheElements() {
@@ -203,11 +215,24 @@ class ReaderPanel {
   playFromParagraph(index) {
     if (this.ttsEngine) {
       this.resetHighlights();
-      for (let i = 0; i < index; i++) {
-        this.markParagraphCompleted(i);
-      }
+      this.markParagraphsCompletedBefore(index);
       this.ttsEngine.playFrom(index);
     }
+  }
+
+  goToParagraph(index) {
+    this.resetHighlights();
+    this.markParagraphsCompletedBefore(index);
+    this.highlightParagraph(index);
+    playlist.goTo(index);
+    this.updateProgress(index, this.content.paragraphs.length);
+  }
+
+  markParagraphsCompletedBefore(index) {
+    const paragraphs = this.elements.content.querySelectorAll('.paragraph');
+    paragraphs.forEach((p, i) => {
+      if (i < index) p.classList.add('completed');
+    });
   }
 
   setVoice(voice) {
