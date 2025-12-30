@@ -1,8 +1,7 @@
 // reader/debug.js - Debug utilities for method logging
 
-const DEBUG = true; // Set to false to disable logging
+const DEBUG = true;
 
-// Track call depth for indentation
 let callDepth = 0;
 
 /**
@@ -85,7 +84,6 @@ export function withMethodLogging(instance, className) {
       try {
         const result = originalMethod(...args);
 
-        // Handle async methods
         if (result instanceof Promise) {
           return result.then(value => {
             callDepth--;
@@ -98,7 +96,6 @@ export function withMethodLogging(instance, className) {
           });
         }
 
-        // Sync method
         callDepth--;
         console.log(`${returnLabel} =>`, result === undefined ? 'undefined' : formatValue(result));
         return result;

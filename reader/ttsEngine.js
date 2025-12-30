@@ -24,9 +24,7 @@ export default class TTSEngine {
       speed: 1.0,
     };
 
-    // Register state change callback with playlist
     playlist.onStateChange((state) => {
-      // Map 'stopping' to 'idle' for UI (UI doesn't need to know about stopping)
       const uiState = state === 'stopping' ? 'idle' : state;
       this.callbacks.onStateChange?.(uiState);
     });
@@ -66,13 +64,8 @@ export default class TTSEngine {
    * @param {number} index - Paragraph index to start from
    */
   async playFrom(index) {
-    // Stop any current playback and wait for loop to exit
     await this.stop();
-
-    // Jump to the specified index
     playlist.goTo(index);
-
-    // Start playing
     await this.play();
   }
 
@@ -85,32 +78,19 @@ export default class TTSEngine {
         const paragraph = playlist.getCurrentParagraph();
         const currentIndex = playlist.getCurrentIndex();
 
-        // Notify paragraph start
         this.callbacks.onParagraphStart?.(currentIndex);
 
-        // Synthesize audio for this paragraph
         const audioData = await this.synthesizeParagraph(paragraph.text);
-
-        // Check if we should stop (might have been called during synthesis)
         if (!playlist.shouldContinue()) break;
 
-        // Play the audio
         await this.audioPlayer.play(audioData);
-
-        // Check if we should stop (might have been called during playback)
         if (!playlist.shouldContinue()) break;
 
-        // Notify paragraph end
         this.callbacks.onParagraphEnd?.(currentIndex);
-
-        // Move to next paragraph
         playlist.advance();
-
-        // Update progress
         this.callbacks.onProgress?.(playlist.getCurrentIndex(), playlist.getTotal());
       }
 
-      // Reading complete - only set idle if we finished naturally (not stopped)
       if (playlist.shouldContinue()) {
         playlist.requestStop();
       }
@@ -118,7 +98,6 @@ export default class TTSEngine {
       this.callbacks.onError?.(error);
       playlist.requestStop();
     } finally {
-      // Always notify that loop has exited
       playlist.notifyLoopExit();
     }
   }
@@ -135,7 +114,6 @@ export default class TTSEngine {
       return await this.apiClient.synthesize(text, this.options);
     }
 
-    // For multiple chunks, synthesize each and concatenate
     const audioBuffers = [];
     for (const chunk of chunks) {
       if (!playlist.shouldContinue()) break;
@@ -191,25 +169,20 @@ export default class TTSEngine {
     const state = playlist.getState();
     if (state !== 'playing' && state !== 'paused') return;
 
-    // Save current and next index before stopping (stop resets index to 0)
     const currentIndex = playlist.getCurrentIndex();
     const nextIndex = currentIndex + 1;
     const total = playlist.getTotal();
 
-    // Mark current as completed
     this.callbacks.onParagraphEnd?.(currentIndex);
 
-    // Stop current playback and wait for old loop to exit
     this.audioPlayer.stop();
     await playlist.requestStop();
 
     if (nextIndex < total) {
-      // Go to next paragraph and start playing
       playlist.goTo(nextIndex);
       this.callbacks.onProgress?.(nextIndex, total);
       await this.play();
     } else {
-      // No more paragraphs
       this.callbacks.onProgress?.(total, total);
     }
   }

@@ -7,8 +7,6 @@ export default class AudioPlayer {
     this.audio = new Audio();
     this.currentObjectUrl = null;
     this.isPlaying = false;
-
-    // Store resolve function to allow stop() to resolve pending play()
     this.pendingResolve = null;
     this.pendingReject = null;
 
@@ -22,21 +20,14 @@ export default class AudioPlayer {
    */
   play(audioData) {
     return new Promise((resolve, reject) => {
-      // Store resolve/reject so stop() can use them
       this.pendingResolve = resolve;
       this.pendingReject = reject;
-
-      // Cleanup previous object URL
       this.cleanup();
 
-      // Create blob and object URL
       const blob = new Blob([audioData], { type: 'audio/mpeg' });
       this.currentObjectUrl = URL.createObjectURL(blob);
-
-      // Set up audio element
       this.audio.src = this.currentObjectUrl;
 
-      // Handle completion
       const onEnded = () => {
         this.isPlaying = false;
         this.audio.removeEventListener('ended', onEnded);
@@ -46,7 +37,6 @@ export default class AudioPlayer {
         resolve();
       };
 
-      // Handle errors
       const onError = (e) => {
         this.isPlaying = false;
         this.audio.removeEventListener('ended', onEnded);
@@ -59,7 +49,6 @@ export default class AudioPlayer {
       this.audio.addEventListener('ended', onEnded);
       this.audio.addEventListener('error', onError);
 
-      // Start playback
       this.audio.play()
         .then(() => {
           this.isPlaying = true;
@@ -96,15 +85,13 @@ export default class AudioPlayer {
   }
 
   /**
-   * Stop audio playback and reset
-   * Resolves any pending play() Promise
+   * Stop audio playback and reset. Resolves any pending play() Promise.
    */
   stop() {
     this.audio.pause();
     this.audio.currentTime = 0;
     this.isPlaying = false;
 
-    // Resolve pending play() Promise so the loop can exit
     if (this.pendingResolve) {
       this.pendingResolve();
       this.pendingResolve = null;

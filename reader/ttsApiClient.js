@@ -64,15 +64,12 @@ export default class TTSApiClient {
         break;
       }
 
-      // Find a good break point within the limit
       let breakPoint = maxLength;
 
-      // Try to break at sentence boundary (. followed by space)
       const sentenceBreak = remaining.lastIndexOf('. ', maxLength);
       if (sentenceBreak > maxLength * 0.5) {
-        breakPoint = sentenceBreak + 1; // Include the period
+        breakPoint = sentenceBreak + 1;
       } else {
-        // Fall back to word boundary
         const wordBreak = remaining.lastIndexOf(' ', maxLength);
         if (wordBreak > maxLength * 0.5) {
           breakPoint = wordBreak;

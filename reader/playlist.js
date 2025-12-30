@@ -39,29 +39,22 @@ class Playlist {
    */
   requestPlay() {
     if (this.state === 'stopping') {
-      // Can't play while stopping
       return false;
     }
 
     if (this.state === 'paused') {
-      // Resume from paused
       this.setState('playing');
       return true;
     }
 
     if (this.state === 'idle') {
-      // Start fresh
       this.setState('playing');
-
-      // Create a new exit promise for this loop
       this.loopExitPromise = new Promise(resolve => {
         this.loopExitResolve = resolve;
       });
-
       return true;
     }
 
-    // Already playing
     return false;
   }
 
@@ -83,17 +76,14 @@ class Playlist {
       return;
     }
 
-    // Set stopping state if not already stopping
     if (this.state === 'playing' || this.state === 'paused') {
       this.setState('stopping');
     }
 
-    // Always wait for the loop to exit (whether we just set stopping or it was already stopping)
     if (this.loopExitPromise) {
       await this.loopExitPromise;
     }
 
-    // Clean up
     this.currentIndex = 0;
     this.setState('idle');
   }

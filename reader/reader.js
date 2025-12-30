@@ -74,7 +74,6 @@ class ReaderPanel {
 
   async initTTS() {
     try {
-      // Get API key and saved preferences from storage
       const { openaiKey, ttsVoice, ttsSpeed } = await chrome.storage.local.get([
         'openaiKey',
         'ttsVoice',
@@ -86,7 +85,6 @@ class ReaderPanel {
         return;
       }
 
-      // Apply saved preferences to UI
       if (ttsVoice) {
         this.elements.voiceSelect.value = ttsVoice;
       }
@@ -96,11 +94,9 @@ class ReaderPanel {
         this.updateTimeEstimate();
       }
 
-      // Create TTS components
       const apiClient = new TTSApiClient(openaiKey);
       const audioPlayer = new AudioPlayer();
 
-      // Create TTS engine with callbacks
       this.ttsEngine = new TTSEngine(apiClient, audioPlayer, {
         onParagraphStart: (index) => this.highlightParagraph(index),
         onParagraphEnd: (index) => this.markParagraphCompleted(index),
@@ -109,7 +105,6 @@ class ReaderPanel {
         onError: (error) => this.showError(`Playback error: ${error.message}`),
       });
 
-      // Apply saved preferences to engine
       if (ttsVoice) {
         this.ttsEngine.setVoice(ttsVoice);
       }
@@ -117,12 +112,10 @@ class ReaderPanel {
         this.ttsEngine.setSpeed(parseFloat(ttsSpeed));
       }
 
-      // Load content into engine
       if (this.content?.paragraphs) {
         this.ttsEngine.loadContent(this.content.paragraphs);
       }
 
-      // Enable controls
       this.enableControls();
 
     } catch (error) {
@@ -138,10 +131,8 @@ class ReaderPanel {
 
   async loadContent() {
     try {
-      // First check if content is already cached
       let response = await chrome.runtime.sendMessage({ type: 'GET_READER_CONTENT' });
 
-      // If no cached content, request extraction
       if (!response?.content) {
         this.showPlaceholder('Extracting content...');
         response = await chrome.runtime.sendMessage({ type: 'EXTRACT_CONTENT' });
@@ -161,7 +152,6 @@ class ReaderPanel {
       this.updateTimeEstimate();
       this.updateProgress(0, this.content.paragraphs.length);
 
-      // If TTS engine already exists, load content into it
       if (this.ttsEngine) {
         this.ttsEngine.loadContent(this.content.paragraphs);
       }
@@ -173,21 +163,17 @@ class ReaderPanel {
   renderContent() {
     if (!this.content?.paragraphs) return;
 
-    // Add page title if available
     let html = '';
     if (this.content.title) {
       html += `<h1 class="page-title">${this.escapeHtml(this.content.title)}</h1>`;
     }
 
-    // Render paragraphs
     html += this.content.paragraphs
       .map((p, index) => `<div class="paragraph" id="${p.id}" data-index="${index}">${this.escapeHtml(p.text)}</div>`)
       .join('');
 
     this.elements.content.innerHTML = html;
   }
-
-  // TTS Control Methods
 
   play() {
     if (this.ttsEngine) {
@@ -216,9 +202,7 @@ class ReaderPanel {
 
   playFromParagraph(index) {
     if (this.ttsEngine) {
-      // Reset highlights before starting from new position
       this.resetHighlights();
-      // Mark all paragraphs before the selected one as completed
       for (let i = 0; i < index; i++) {
         this.markParagraphCompleted(i);
       }
@@ -230,7 +214,6 @@ class ReaderPanel {
     if (this.ttsEngine) {
       this.ttsEngine.setVoice(voice);
     }
-    // Save preference
     chrome.storage.local.set({ ttsVoice: voice });
   }
 
@@ -238,18 +221,13 @@ class ReaderPanel {
     if (this.ttsEngine) {
       this.ttsEngine.setSpeed(speed);
     }
-    // Save preference
     chrome.storage.local.set({ ttsSpeed: speed });
   }
 
-  // UI Update Methods
-
   highlightParagraph(index) {
-    // Remove current highlight from all paragraphs
     const paragraphs = this.elements.content.querySelectorAll('.paragraph');
     paragraphs.forEach(p => p.classList.remove('current'));
 
-    // Add highlight to current paragraph
     const currentParagraph = this.elements.content.querySelector(`[data-index="${index}"]`);
     if (currentParagraph) {
       currentParagraph.classList.add('current');
@@ -306,7 +284,6 @@ class ReaderPanel {
     if (!this.content?.totalCharCount) return;
 
     const speed = parseFloat(this.elements.speedSlider.value);
-    // ~150 words/min at speed 1.0, avg word = 5 chars
     const wordsPerMinute = 150 * speed;
     const totalWords = this.content.totalCharCount / 5;
     const minutes = totalWords / wordsPerMinute;
