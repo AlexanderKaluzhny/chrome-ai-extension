@@ -24,6 +24,8 @@ export default class TTSEngine {
       speed: 1.0,
     };
 
+    this.prefetchCache = [];
+
     playlist.onStateChange((state) => {
       const uiState = state === 'stopping' ? 'idle' : state;
       this.callbacks.onStateChange?.(uiState);
@@ -38,6 +40,7 @@ export default class TTSEngine {
    */
   loadContent(paragraphs) {
     playlist.loadContent(paragraphs);
+    this.prefetchCache = new Array(paragraphs.length).fill(null);
   }
 
   /**
@@ -80,8 +83,17 @@ export default class TTSEngine {
 
         this.callbacks.onParagraphStart?.(currentIndex);
 
-        const audioData = await this.synthesizeParagraph(paragraph.text);
+        let audioData;
+        if (this.prefetchCache[currentIndex]) {
+          audioData = this.prefetchCache[currentIndex];
+        } else {
+          audioData = await this.synthesizeParagraph(paragraph.text);
+          this.prefetchCache[currentIndex] = audioData;
+        }
+
         if (!playlist.shouldContinue()) break;
+
+        this.prefetchNext();
 
         await this.audioPlayer.play(audioData);
         if (!playlist.shouldContinue()) break;
@@ -98,6 +110,7 @@ export default class TTSEngine {
       this.callbacks.onError?.(error);
       playlist.requestStop();
     } finally {
+      this.clearPrefetch();
       playlist.notifyLoopExit();
     }
   }
@@ -157,6 +170,7 @@ export default class TTSEngine {
    * @returns {Promise} Resolves when fully stopped
    */
   async stop() {
+    this.clearPrefetch();
     this.audioPlayer.stop();
     await playlist.requestStop();
     this.callbacks.onProgress?.(0, playlist.getTotal());
@@ -188,11 +202,44 @@ export default class TTSEngine {
   }
 
   /**
+   * Start prefetching the next paragraph (non-blocking)
+   */
+  prefetchNext() {
+    const nextIndex = playlist.getCurrentIndex() + 1;
+    if (nextIndex >= playlist.getTotal()) {
+      return;
+    }
+
+    if (this.prefetchCache[nextIndex]) {
+      return;
+    }
+
+    const nextParagraph = playlist.paragraphs[nextIndex];
+    if (!nextParagraph) {
+      return;
+    }
+
+    this.synthesizeParagraph(nextParagraph.text)
+      .then(audio => {
+        this.prefetchCache[nextIndex] = audio;
+      })
+      .catch(() => {});
+  }
+
+  /**
+   * Clear prefetched audio cache
+   */
+  clearPrefetch() {
+    this.prefetchCache = new Array(playlist.getTotal()).fill(null);
+  }
+
+  /**
    * Set voice option
    * @param {string} voice - Voice name
    */
   setVoice(voice) {
     this.options.voice = voice;
+    this.clearPrefetch();
   }
 
   /**
@@ -201,5 +248,6 @@ export default class TTSEngine {
    */
   setSpeed(speed) {
     this.options.speed = speed;
+    this.clearPrefetch();
   }
 }

@@ -367,7 +367,7 @@ Formula based on TTS-1 characteristics:
 - [x] Voice/Speed preferences are persisted to storage
 - [x] "Play from here" (click paragraph) - Fixed with Playlist state machine
 - [ ] Error handling works (no API key, network error, rate limit)
-- [ ] Prefetching reduces latency between paragraphs
+- [x] Prefetching reduces latency between paragraphs
 - [ ] Long paragraphs (>4096 chars) are properly chunked
 
 ---
@@ -432,10 +432,15 @@ Formula based on TTS-1 characteristics:
   - Arguments and return values formatted
   - Async-aware (handles Promises correctly)
 
+- **Prefetching** (`reader/ttsEngine.js`):
+  - Synthesizes next paragraph while current plays
+  - Uses `prefetchedAudio`, `prefetchIndex`, `prefetchPromise` state
+  - Invalidated on stop, playFrom, voice/speed change
+  - Graceful degradation if prefetch fails
+
 ### Not Started
 - Phase 4.2: Error handling improvements
 - Phase 4.4: Accessibility
-- Prefetching optimization
 
 ### Files Created/Modified
 - `reader/playlist.js` - NEW: Singleton playlist with state machine
