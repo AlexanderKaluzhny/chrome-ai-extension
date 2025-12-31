@@ -1,7 +1,8 @@
-// reader/ttsEngine.js - Orchestrates reading flow using Playlist for state
+// reader/ttsEngine.js - Orchestrates reading flow using Playlist for state and AudioCache for audio
 
 import { withMethodLogging } from './debug.js';
 import playlist from './playlist.js';
+import AudioCache from './audioCache.js';
 
 export default class TTSEngine {
   /**
@@ -12,19 +13,18 @@ export default class TTSEngine {
    * @param {Function} callbacks.onParagraphEnd - Called when paragraph ends (index)
    * @param {Function} callbacks.onProgress - Called on progress update (current, total)
    * @param {Function} callbacks.onStateChange - Called on state change (state)
+   * @param {Function} callbacks.onLoadingStart - Called when synthesis starts for a paragraph (index)
+   * @param {Function} callbacks.onLoadingEnd - Called when synthesis ends for a paragraph (index)
    * @param {Function} callbacks.onError - Called on error (error)
    */
   constructor(apiClient, audioPlayer, callbacks = {}) {
-    this.apiClient = apiClient;
     this.audioPlayer = audioPlayer;
     this.callbacks = callbacks;
 
-    this.options = {
-      voice: 'alloy',
-      speed: 1.0,
-    };
-
-    this.prefetchCache = [];
+    this.audioCache = new AudioCache(apiClient, {
+      onLoadingStart: callbacks.onLoadingStart,
+      onLoadingEnd: callbacks.onLoadingEnd,
+    });
 
     playlist.onStateChange((state) => {
       const uiState = state === 'stopping' ? 'idle' : state;
@@ -40,7 +40,7 @@ export default class TTSEngine {
    */
   loadContent(paragraphs) {
     playlist.loadContent(paragraphs);
-    this.prefetchCache = new Array(paragraphs.length).fill(null);
+    this.audioCache.init(paragraphs);
   }
 
   /**
@@ -78,22 +78,18 @@ export default class TTSEngine {
   async readFromCurrent() {
     try {
       while (playlist.hasMore() && playlist.shouldContinue()) {
-        const paragraph = playlist.getCurrentParagraph();
         const currentIndex = playlist.getCurrentIndex();
 
         this.callbacks.onParagraphStart?.(currentIndex);
 
-        let audioData;
-        if (this.prefetchCache[currentIndex]) {
-          audioData = this.prefetchCache[currentIndex];
-        } else {
-          audioData = await this.synthesizeParagraph(paragraph.text);
-          this.prefetchCache[currentIndex] = audioData;
-        }
+        const audioData = await this.audioCache.get(
+          currentIndex,
+          () => playlist.shouldContinue()
+        );
 
         if (!playlist.shouldContinue()) break;
 
-        this.prefetchNext();
+        this.audioCache.prefetch(currentIndex + 1);
 
         await this.audioPlayer.play(audioData);
         if (!playlist.shouldContinue()) break;
@@ -110,49 +106,8 @@ export default class TTSEngine {
       this.callbacks.onError?.(error);
       playlist.requestStop();
     } finally {
-      this.clearPrefetch();
       playlist.notifyLoopExit();
     }
-  }
-
-  /**
-   * Synthesize audio for a paragraph, handling chunking if needed
-   * @param {string} text - Paragraph text
-   * @returns {Promise<ArrayBuffer>} Audio data
-   */
-  async synthesizeParagraph(text) {
-    const chunks = this.apiClient.splitTextIntoChunks(text);
-
-    if (chunks.length === 1) {
-      return await this.apiClient.synthesize(text, this.options);
-    }
-
-    const audioBuffers = [];
-    for (const chunk of chunks) {
-      if (!playlist.shouldContinue()) break;
-      const audioData = await this.apiClient.synthesize(chunk, this.options);
-      audioBuffers.push(audioData);
-    }
-
-    return this.concatenateAudioBuffers(audioBuffers);
-  }
-
-  /**
-   * Concatenate multiple ArrayBuffers into one
-   * @param {ArrayBuffer[]} buffers - Array of ArrayBuffers
-   * @returns {ArrayBuffer} Combined ArrayBuffer
-   */
-  concatenateAudioBuffers(buffers) {
-    const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
-    const result = new Uint8Array(totalLength);
-
-    let offset = 0;
-    for (const buffer of buffers) {
-      result.set(new Uint8Array(buffer), offset);
-      offset += buffer.byteLength;
-    }
-
-    return result.buffer;
   }
 
   /**
@@ -170,7 +125,6 @@ export default class TTSEngine {
    * @returns {Promise} Resolves when fully stopped
    */
   async stop() {
-    this.clearPrefetch();
     this.audioPlayer.stop();
     await playlist.requestStop();
     this.callbacks.onProgress?.(0, playlist.getTotal());
@@ -202,44 +156,11 @@ export default class TTSEngine {
   }
 
   /**
-   * Start prefetching the next paragraph (non-blocking)
-   */
-  prefetchNext() {
-    const nextIndex = playlist.getCurrentIndex() + 1;
-    if (nextIndex >= playlist.getTotal()) {
-      return;
-    }
-
-    if (this.prefetchCache[nextIndex]) {
-      return;
-    }
-
-    const nextParagraph = playlist.paragraphs[nextIndex];
-    if (!nextParagraph) {
-      return;
-    }
-
-    this.synthesizeParagraph(nextParagraph.text)
-      .then(audio => {
-        this.prefetchCache[nextIndex] = audio;
-      })
-      .catch(() => {});
-  }
-
-  /**
-   * Clear prefetched audio cache
-   */
-  clearPrefetch() {
-    this.prefetchCache = new Array(playlist.getTotal()).fill(null);
-  }
-
-  /**
    * Set voice option
    * @param {string} voice - Voice name
    */
   setVoice(voice) {
-    this.options.voice = voice;
-    this.clearPrefetch();
+    this.audioCache.setOptions({ voice });
   }
 
   /**
@@ -247,7 +168,6 @@ export default class TTSEngine {
    * @param {number} speed - Speed value (0.25 to 4.0)
    */
   setSpeed(speed) {
-    this.options.speed = speed;
-    this.clearPrefetch();
+    this.audioCache.setOptions({ speed });
   }
 }

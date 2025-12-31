@@ -114,6 +114,8 @@ class ReaderPanel {
         onParagraphEnd: (index) => this.markParagraphCompleted(index),
         onProgress: (current, total) => this.updateProgress(current, total),
         onStateChange: (state) => this.updateControlsState(state),
+        onLoadingStart: (index) => this.showParagraphLoading(index),
+        onLoadingEnd: (index) => this.hideParagraphLoading(index),
         onError: (error) => this.showError(`Playback error: ${error.message}`),
       });
 
@@ -257,6 +259,20 @@ class ReaderPanel {
     if (currentParagraph) {
       currentParagraph.classList.add('current');
       currentParagraph.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  showParagraphLoading(index) {
+    const paragraph = this.elements.content.querySelector(`[data-index="${index}"]`);
+    if (paragraph) {
+      paragraph.classList.add('loading');
+    }
+  }
+
+  hideParagraphLoading(index) {
+    const paragraph = this.elements.content.querySelector(`[data-index="${index}"]`);
+    if (paragraph) {
+      paragraph.classList.remove('loading');
     }
   }
 

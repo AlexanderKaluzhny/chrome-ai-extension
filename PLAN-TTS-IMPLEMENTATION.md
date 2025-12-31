@@ -400,7 +400,7 @@ Formula based on TTS-1 characteristics:
 
 ## Current Implementation Status
 
-**Last Updated:** 2025-12-30
+**Last Updated:** 2025-12-31
 
 ### Completed
 - Phase 1: Side Panel Setup & Text Extraction ✅
@@ -414,6 +414,7 @@ Formula based on TTS-1 characteristics:
 - **Race condition in `playFrom()`** - Fixed by introducing Playlist component with state machine
 - **Race condition in `skip()`** - Fixed by waiting for old loop to exit before advancing
 - **`audioPlayer.stop()` not resolving pending Promise** - Fixed by storing and calling pendingResolve
+- **Prefetch cache cleared on skip/stop** - Cache was being cleared in `readFromCurrent()` finally block and `stop()`, discarding prefetched audio. Now cache only clears on content/settings change.
 
 ### Architecture Improvements
 - **Playlist component** (`reader/playlist.js`) - Singleton that manages playback state:
@@ -433,11 +434,18 @@ Formula based on TTS-1 characteristics:
   - Arguments and return values formatted
   - Async-aware (handles Promises correctly)
 
-- **Prefetching** (`reader/ttsEngine.js`):
-  - Synthesizes next paragraph while current plays
-  - Uses `prefetchedAudio`, `prefetchIndex`, `prefetchPromise` state
-  - Invalidated on stop, playFrom, voice/speed change
-  - Graceful degradation if prefetch fails
+- **AudioCache component** (`reader/audioCache.js`) - Centralized audio caching and fetching:
+  - `get(index)` - returns cached audio or fetches from API
+  - `prefetch(index)` - non-blocking background fetch
+  - `pendingFetches` Map - prevents duplicate API requests
+  - Loading callbacks (`onLoadingStart`/`onLoadingEnd`) for UI feedback
+  - Handles text chunking for paragraphs > 4096 chars
+  - Cache invalidated only on voice/speed change
+
+- **Loading indicator** - Visual feedback when fetching audio:
+  - Orange pulsing animation on paragraph being fetched
+  - Shows for both current paragraph and prefetching next
+  - Implemented via `.loading` CSS class
 
 - **Navigate in Reader** (`content.js`, `background.js`, `reader.js`):
   - User selects text on page, clicks "Navigate in Reader" button in bubble
@@ -453,9 +461,12 @@ Formula based on TTS-1 characteristics:
 
 ### Files Created/Modified
 - `reader/playlist.js` - NEW: Singleton playlist with state machine
+- `reader/audioCache.js` - NEW: Centralized audio caching, fetching, loading state
 - `reader/debug.js` - Enhanced with call depth, args, return values
-- `reader/ttsEngine.js` - Refactored to use Playlist
+- `reader/ttsEngine.js` - Refactored to use Playlist and AudioCache
 - `reader/audioPlayer.js` - Fixed stop() to resolve pending play()
+- `reader/reader.js` - Added loading indicator callbacks
+- `reader/reader.css` - Added `.loading` style with pulse animation
 - `PROBLEM-STATE-MACHINE.md` - Documents the race condition analysis
 - `content.js` - Added "Navigate in Reader" with truncated HTML logic
 - `content.html` - Added "Navigate in Reader" button to word bubble
@@ -467,6 +478,6 @@ Formula based on TTS-1 characteristics:
 
 - **4096 character limit**: TTS-1 has a max input of 4096 chars. Long paragraphs are automatically chunked.
 - **Voice options for TTS-1**: `alloy`, `ash`, `coral`, `echo`, `fable`, `onyx`, `nova`, `sage`, `shimmer`
-- **Prefetching**: Next paragraph is prefetched while current is playing to reduce latency.
+- **Prefetching**: Next paragraph is prefetched while current is playing to reduce latency. Managed by `AudioCache` class with duplicate request prevention.
 - **ES Modules**: All reader modules use ES module syntax (`import`/`export`).
 - **Content extraction**: Uses Readability library (already in project) via `chrome.scripting.executeScript()`.
