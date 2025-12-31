@@ -37,8 +37,14 @@ document.addEventListener("dblclick", async () => {
     ? blockEl.textContent.trim()
     : document.body.innerText.trim();
 
+  // Capture target element for "Navigate in Reader" (must be done now, before selection is lost)
+  const clickedElement = selection.anchorNode?.nodeType === Node.TEXT_NODE
+    ? selection.anchorNode.parentElement
+    : selection.anchorNode;
+  const targetElement = clickedElement?.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, div, article, section') || clickedElement;
+
   // Show the bubble with buttons instead of immediately fetching the definition
-  showBubbleWithOptions(selection.getRangeAt(0).getBoundingClientRect(), word, context);
+  showBubbleWithOptions(selection.getRangeAt(0).getBoundingClientRect(), word, context, targetElement);
 });
 
 // Helper to find the nearest block-level ancestor for broader context
@@ -56,7 +62,7 @@ function findBlockAncestor(el) {
 }
 
 // Show bubble with "Define" and "Specify prompt" buttons
-async function showBubbleWithOptions(rect, word, context) {
+async function showBubbleWithOptions(rect, word, context, targetElement) {
   // Make sure template is loaded
   if (!bubbleTemplate) {
     bubbleTemplate = await fetchBubbleTemplate();
@@ -175,20 +181,9 @@ async function showBubbleWithOptions(rect, word, context) {
     bubble.remove();
   });
 
-  // Read from here button click handler
+  // Read from here button click handler (uses targetElement captured at dblclick time)
   const readFromHereBtn = bubble.querySelector('.read-from-here-btn');
   readFromHereBtn.addEventListener('click', async () => {
-    const selection = window.getSelection();
-    const anchorNode = selection.anchorNode;
-    const clickedElement = anchorNode.nodeType === Node.TEXT_NODE
-      ? anchorNode.parentElement
-      : anchorNode;
-
-    // Find nearest block-level ancestor
-    const blockElement = clickedElement.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, div, article, section');
-    const targetElement = blockElement || clickedElement;
-
-    // Create truncated document and count paragraphs using Readability
     const paragraphIndex = getParagraphIndexFromTruncatedDoc(targetElement);
 
     bubble.remove();
