@@ -181,6 +181,28 @@ async function showBubbleWithOptions(rect, word, context, targetElement) {
     bubble.remove();
   });
 
+  // Pronounce button click handler (audio plays in offscreen document to bypass page CSP)
+  const pronounceBtn = bubble.querySelector('.pronounce-btn');
+
+  pronounceBtn.addEventListener('click', async () => {
+    pronounceBtn.textContent = '⏳';
+    pronounceBtn.disabled = true;
+
+    try {
+      const { error } = await chrome.runtime.sendMessage({
+        type: 'SYNTHESIZE_WORD',
+        text: word
+      });
+
+      if (error) throw new Error(error);
+    } catch (err) {
+      console.error('Pronunciation error:', err);
+    } finally {
+      pronounceBtn.textContent = '🔊';
+      pronounceBtn.disabled = false;
+    }
+  });
+
   // Read from here button click handler (uses targetElement captured at dblclick time)
   const readFromHereBtn = bubble.querySelector('.read-from-here-btn');
   readFromHereBtn.addEventListener('click', async () => {
@@ -219,134 +241,4 @@ function handleClickOutside(e) {
   }
 }
 
-// ============================================================================
-// Truncated HTML helpers for "Read from here" feature
-// ============================================================================
-
-/**
- * Creates a truncated document, runs Readability on it, and returns the
- * paragraph index (0-based) of the last paragraph. This index corresponds
- * to the paragraph containing the clicked element.
- * @param {Element} targetElement - The element user clicked on
- * @returns {number} Paragraph index (0 if no content found)
- */
-function getParagraphIndexFromTruncatedDoc(targetElement) {
-  // Create truncated HTML
-  const truncatedHtml = createTruncatedHtml(targetElement);
-
-  // Parse truncated HTML
-  const parser = new DOMParser();
-  const truncatedDoc = parser.parseFromString(truncatedHtml, 'text/html');
-
-  // Run Readability on truncated document
-  let article;
-  try {
-    article = new Readability(truncatedDoc).parse();
-  } catch (e) {
-    return 0;
-  }
-
-  if (!article || !article.content) {
-    return 0;
-  }
-
-  // Extract paragraphs from Readability's output
-  const contentDoc = parser.parseFromString(article.content, 'text/html');
-  const blocks = contentDoc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
-
-  // Count paragraphs
-  let paragraphCount = 0;
-  for (const el of blocks) {
-    const text = el.textContent?.trim();
-    if (text && text.length > 0) {
-      paragraphCount++;
-    }
-  }
-
-  // Return last paragraph index (0-based)
-  return paragraphCount > 0 ? paragraphCount - 1 : 0;
-}
-
-/**
- * Creates a truncated copy of the document HTML where everything after
- * the target element is removed. This allows Readability to extract only
- * the content up to and including the clicked element.
- * @param {Element} targetElement - The element user clicked on
- * @returns {string} Truncated HTML string
- */
-function createTruncatedHtml(targetElement) {
-  // Clone the entire document
-  const clone = document.documentElement.cloneNode(true);
-
-  // Build path from root to target element (array of child indices)
-  const path = getElementPath(targetElement);
-
-  // Find the same element in the cloned document
-  const targetInClone = followPath(clone, path);
-
-  if (targetInClone) {
-    // Remove all nodes that come after the target in document order
-    removeNodesAfter(targetInClone);
-  }
-
-  return clone.outerHTML;
-}
-
-/**
- * Builds a path from document root to the given element.
- * Path is an array of child indices at each level.
- * @param {Element} element - Target element
- * @returns {number[]} Array of indices
- */
-function getElementPath(element) {
-  const path = [];
-  let current = element;
-
-  while (current && current !== document.documentElement) {
-    const parent = current.parentElement;
-    if (parent) {
-      const index = Array.from(parent.children).indexOf(current);
-      path.unshift(index);
-    }
-    current = parent;
-  }
-
-  return path;
-}
-
-/**
- * Follows a path of child indices from root to find an element.
- * @param {Element} root - Root element to start from
- * @param {number[]} path - Array of child indices
- * @returns {Element|null} Found element or null
- */
-function followPath(root, path) {
-  let current = root;
-  for (const index of path) {
-    if (current.children && current.children[index]) {
-      current = current.children[index];
-    } else {
-      return null;
-    }
-  }
-  return current;
-}
-
-/**
- * Removes all nodes that come after the given element in document order.
- * This includes: siblings after the element, and all "uncle" nodes
- * (siblings of ancestors that come after the ancestor).
- * @param {Element} element - The element to truncate after
- */
-function removeNodesAfter(element) {
-  let current = element;
-
-  while (current && current.parentElement) {
-    // Remove all siblings after current element
-    while (current.nextElementSibling) {
-      current.nextElementSibling.remove();
-    }
-    // Move up to parent and repeat (removes "uncle" nodes)
-    current = current.parentElement;
-  }
-}
+// Truncated HTML helpers are in utils/truncatedHtml.js (injected before this script)

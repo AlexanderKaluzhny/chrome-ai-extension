@@ -1,5 +1,5 @@
-importScripts('/lib/Readability.min.js');
-// importScripts('/lib/DOMPurify.min.js');
+// ES module - Readability is injected into pages, not used directly here
+import { synthesizeText } from './utils/tts.js';
 
 const CONFIG = {
   DEFAULT_OPENAI_MODEL: 'gpt-4o-mini',
@@ -83,6 +83,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'READ_FROM_HERE') {
     handleReadFromHere(msg.paragraphIndex)
       .then(result => sendResponse(result))
+      .catch(error => sendResponse({ error: error.message }));
+    return true;
+  }
+
+  if (msg.type === 'SYNTHESIZE_WORD') {
+    pronounceWord(msg.text)
+      .then(() => sendResponse({ success: true }))
       .catch(error => sendResponse({ error: error.message }));
     return true;
   }
@@ -328,6 +335,58 @@ async function handleReadFromHere(paragraphIndex) {
   // Notify reader panel to navigate to the paragraph
   await chrome.runtime.sendMessage({ type: 'GO_TO_PARAGRAPH', paragraphIndex });
   return { success: true, paragraphIndex };
+}
+
+// Offscreen document management for audio playback
+let creatingOffscreen = null;
+
+// Cache for pronounced words (cleared on voice/speed change)
+const pronunciationCache = new Map();
+
+async function ensureOffscreenDocument() {
+  const existingContexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT']
+  });
+
+  if (existingContexts.length > 0) {
+    return;
+  }
+
+  if (creatingOffscreen) {
+    await creatingOffscreen;
+    return;
+  }
+
+  creatingOffscreen = chrome.offscreen.createDocument({
+    url: 'offscreen.html',
+    reasons: ['AUDIO_PLAYBACK'],
+    justification: 'Play TTS audio for word pronunciation'
+  });
+
+  await creatingOffscreen;
+  creatingOffscreen = null;
+}
+
+async function pronounceWord(text) {
+  let audioArray = pronunciationCache.get(text);
+
+  if (!audioArray) {
+    const audioBuffer = await synthesizeText(text);
+    // Convert ArrayBuffer to regular array for message passing and caching
+    audioArray = Array.from(new Uint8Array(audioBuffer));
+    pronunciationCache.set(text, audioArray);
+  }
+
+  await ensureOffscreenDocument();
+
+  const response = await chrome.runtime.sendMessage({
+    type: 'PLAY_AUDIO',
+    audio: audioArray
+  });
+
+  if (response?.error) {
+    throw new Error(response.error);
+  }
 }
 
 // Function to be injected for content extraction

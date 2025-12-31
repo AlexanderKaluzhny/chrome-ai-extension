@@ -43,6 +43,26 @@
   color: #333;
 }
 
+.pronounce-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  opacity: 0.7;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.pronounce-btn:hover {
+  opacity: 1;
+}
+
+.pronounce-btn:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
 .bubble-actions {
   display: flex;
   justify-content: space-between;

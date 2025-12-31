@@ -14,7 +14,8 @@
     "default_path": "reader/reader.html"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -26,6 +27,7 @@
       ],
       "js": [
         "lib/Readability.min.js",
+        "utils/truncatedHtml.js",
         "content.js"
       ],
       "run_at": "document_idle"
@@ -53,7 +55,8 @@
     "scripting",
     "storage",
     "tabs",
-    "sidePanel"
+    "sidePanel",
+    "offscreen"
   ],
   "host_permissions": [
     "https://api.openai.com/*"
