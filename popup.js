@@ -58,18 +58,19 @@ document.addEventListener("DOMContentLoaded", () => {
     readButton.textContent = "Loading...";
 
     try {
-      // Get current window to open side panel
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-      // Open side panel first (must be in direct user gesture context)
+      // Open side panel (must be in direct user gesture context)
       await chrome.sidePanel.open({ windowId: tab.windowId });
 
-      // Close popup
+      // Tell reader to reload content from current tab
+      await chrome.runtime.sendMessage({ type: 'RELOAD_READER' });
+
       window.close();
     } catch (error) {
       console.error("Error opening reader:", error);
       summaryElement.textContent = "Error: " + error.message;
-      readButton.textContent = "Read";
+      readButton.textContent = "Open in Reader";
       readButton.disabled = false;
     }
   });

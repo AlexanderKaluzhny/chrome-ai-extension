@@ -29,12 +29,33 @@ class ReaderPanel {
         sendResponse({ open: true });
         return true;
       }
+      if (msg.type === 'RELOAD_READER') {
+        this.reloadContent();
+        sendResponse({ success: true });
+        return true;
+      }
       if (msg.type === 'GO_TO_PARAGRAPH' && typeof msg.paragraphIndex === 'number') {
         this.goToParagraph(msg.paragraphIndex);
         sendResponse({ success: true, paragraphIndex: msg.paragraphIndex });
       }
       return true;
     });
+  }
+
+  async reloadContent() {
+    // Stop any playing audio
+    if (this.ttsEngine) {
+      this.ttsEngine.stop();
+    }
+    this.resetHighlights();
+
+    // Force fresh content extraction
+    await this.loadContent(true);
+
+    // Reload TTS engine with new content
+    if (this.ttsEngine && this.content?.paragraphs) {
+      this.ttsEngine.loadContent(this.content.paragraphs);
+    }
   }
 
   cacheElements() {
@@ -147,9 +168,13 @@ class ReaderPanel {
     this.elements.speedSlider.disabled = false;
   }
 
-  async loadContent() {
+  async loadContent(forceRefresh = false) {
     try {
-      let response = await chrome.runtime.sendMessage({ type: 'GET_READER_CONTENT' });
+      let response;
+
+      if (!forceRefresh) {
+        response = await chrome.runtime.sendMessage({ type: 'GET_READER_CONTENT' });
+      }
 
       if (!response?.content) {
         this.showPlaceholder('Extracting content...');
