@@ -57,6 +57,10 @@ A Chrome extension that helps you better understand web content through AI-power
 - [Mozilla's Readability](https://github.com/mozilla/readability) - For extracting clean article content
 - [Marked](https://github.com/markedjs/marked) - For rendering Markdown in summary pages
 
+## Built With
+
+This extension was developed with the assistance of [Claude Code](https://claude.ai/code) and Claude family models by Anthropic.
+
 ## License
 
 ### Third-Party Libraries
