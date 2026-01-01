@@ -136,11 +136,6 @@ async function handleSummarizeTab(customPrompt = '') {
       target: { tabId: tab.id },
       func: () => {
         try {
-          // TODO: When DOMPurify is available, use it like this:
-          // const purifiedHtml = DOMPurify.sanitize(document.documentElement.outerHTML);
-          // const cleanDoc = new DOMParser().parseFromString(purifiedHtml, 'text/html');
-          // const article = new Readability(cleanDoc).parse();
-          
           const article = new Readability(document.cloneNode(true)).parse();
           return article?.textContent || document.body.innerText || '';
         } catch (error) {
@@ -292,7 +287,6 @@ async function extractContentForReader() {
       throw new Error('No active tab found');
     }
 
-
     // Inject Readability library first, then extract content
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
@@ -421,31 +415,6 @@ function extractPageContent() {
       } catch (e) {
         console.warn('Readability failed:', e);
       }
-    }
-
-    // Fallback: extract from DOM directly if Readability didn't work
-    if (paragraphs.length === 0) {
-      // Try to find main content area
-      const mainContent = document.querySelector('article, main, [role="main"], .content, #content')
-                         || document.body;
-
-      const blockElements = mainContent.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre');
-
-      for (const el of blockElements) {
-        const text = el.textContent?.trim();
-        if (text && text.length > 0) {
-          paragraphs.push(text);
-        }
-      }
-    }
-
-    // Last resort: split body text by newlines
-    if (paragraphs.length === 0) {
-      const text = document.body.innerText || '';
-      paragraphs = text
-        .split(/\n\s*\n/)
-        .map(p => p.trim())
-        .filter(p => p.length > 0);
     }
 
     // Split any very long paragraphs (>2000 chars) on sentence boundaries
