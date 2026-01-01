@@ -1,27 +1,31 @@
-A Chrome extension that helps better understand web content through AI-powered summarization and contextual word definitions.
+# AI Page Explorer
+
+A Chrome extension that helps you better understand web content through AI-powered summarization, contextual word definitions, and text-to-speech reading.
 
 ## Features
 
 - **Page Summarization**: Instantly generate concise, well-structured summaries of any webpage
 - **Word Definitions**: Double-click any word to get contextual definitions
-- **Markdown Formatting**: Summaries are formatted with headings, lists, and emphasis for better readability
-- **Popup Interface**: Simple, clean UI for quick interactions
+- **Text-to-Speech Reader**: Listen to articles with a built-in reader panel
+- **Word Pronunciation**: Hear how words are pronounced
+- **Navigate in Reader**: Click any paragraph on the page to jump to it in the reader
 
 ## How It Works
 
 ### Page Summarization
 
-1. Click the extension icon or use the popup interface
-2. The extension parses the current page using Mozilla's Readability library 
+1. Click the extension icon and select "Summarize Page"
+2. The extension parses the current page using Mozilla's Readability library
 3. Content is sent to OpenAI's API to generate a well-structured summary
 4. The summary is displayed in a new tab with clean formatting
 
-### Word Helper
+### Word Explorer
 
 1. Double-click any word on a webpage
 2. The extension captures the word and surrounding context
-3. OpenAI's API provides a contextual definition of the word
-4. The definition appears in a small bubble near the selected word
+3. Click "Define" to get a contextual definition from OpenAI
+4. Click the speaker icon to hear the pronunciation
+5. Use "Navigate in Reader" to jump to that section in the reader panel
 
 ## Installation
 

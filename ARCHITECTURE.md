@@ -1,6 +1,6 @@
 # Architecture Overview
 
-This Chrome extension ("Page Summarizer & Word Helper") combines AI-powered page summarization with an interactive text-to-speech reading experience.
+This Chrome extension ("AI Page Explorer") combines AI-powered page summarization with an interactive text-to-speech reading experience.
 
 ## Directory Structure
 
