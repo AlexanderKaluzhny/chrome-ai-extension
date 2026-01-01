@@ -5,14 +5,22 @@
   <link rel="stylesheet" href="style/popup.css">
 </head>
 <body>
-  <div class="button-group">
-    <button id="summarizeBtn">Summarize</button>
-    <button id="readBtn">Read</button>
+  <div class="popup-section">
+    <label for="customPrompt">Custom instructions</label>
+    <textarea id="customPrompt" rows="2" placeholder="e.g., Focus on key takeaways..."></textarea>
+    <button id="summarizeBtn">Summarize Page</button>
   </div>
+
+  <div class="popup-section">
+    <button id="readBtn" class="secondary">Open Reader Panel</button>
+  </div>
+
   <div id="summary"></div>
-  <div class="input-container">
-    <textarea id="customPrompt" rows="2" placeholder="Add your custom instructions here..."></textarea>
-  </div>
+
+  <footer class="popup-footer">
+    AI-powered page summarizer & word helper
+  </footer>
+
   <script src="popup.js"></script>
 </body>
 </html>

@@ -203,9 +203,23 @@ async function showBubbleWithOptions(rect, word, context, targetElement) {
     }
   });
 
-  // Read from here button click handler (uses targetElement captured at dblclick time)
+  // Read from here button - check if reader panel is open
   const readFromHereBtn = bubble.querySelector('.read-from-here-btn');
+
+  // Check if reader panel is open and enable button if so
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'READER_PING' });
+    if (response?.open) {
+      readFromHereBtn.disabled = false;
+      readFromHereBtn.title = '';
+    }
+  } catch (e) {
+    // Reader not open, button stays disabled
+  }
+
   readFromHereBtn.addEventListener('click', async () => {
+    if (readFromHereBtn.disabled) return;
+
     const paragraphIndex = getParagraphIndexFromTruncatedDoc(targetElement);
 
     bubble.remove();

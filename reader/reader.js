@@ -25,6 +25,10 @@ class ReaderPanel {
 
   listenForMessages() {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+      if (msg.type === 'READER_PING') {
+        sendResponse({ open: true });
+        return true;
+      }
       if (msg.type === 'GO_TO_PARAGRAPH' && typeof msg.paragraphIndex === 'number') {
         this.goToParagraph(msg.paragraphIndex);
         sendResponse({ success: true, paragraphIndex: msg.paragraphIndex });

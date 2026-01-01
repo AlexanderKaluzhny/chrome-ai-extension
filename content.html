@@ -12,9 +12,13 @@
       <button class="close-bubble">×</button>
     </div>
     <div class="bubble-actions">
-      <button class="bubble-btn define-btn">Define</button>
-      <button class="bubble-btn prompt-btn">Specify prompt</button>
-      <button class="bubble-btn read-from-here-btn">Navigate in Reader</button>
+      <div class="bubble-row">
+        <button class="bubble-btn define-btn">Define</button>
+        <button class="bubble-btn prompt-btn">Specify prompt</button>
+      </div>
+      <div class="bubble-row secondary-row">
+        <button class="bubble-btn read-from-here-btn" disabled title="Open the Reader panel first">Navigate in Reader</button>
+      </div>
     </div>
     <div class="prompt-container" style="display: none;">
       <textarea class="prompt-textarea" rows="2" placeholder="Enter your custom prompt..."></textarea>
