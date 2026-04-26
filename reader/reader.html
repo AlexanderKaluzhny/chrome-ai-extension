@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Reader</title>
+  <link rel="stylesheet" href="reader.css">
+</head>
+<body>
+  <div class="reader-container">
+    <header class="reader-header">
+      <h2 class="reader-title">Reader</h2>
+      <div class="reader-info">
+        <span id="time-estimate">--:--</span>
+        <span id="progress">0 / 0</span>
+      </div>
+    </header>
+
+    <div class="reader-controls">
+      <button id="play-btn" class="control-btn" disabled>Play</button>
+      <button id="pause-btn" class="control-btn" disabled>Pause</button>
+      <button id="stop-btn" class="control-btn" disabled>Stop</button>
+      <button id="skip-btn" class="control-btn" disabled>Skip</button>
+
+      <div class="control-group">
+        <label for="voice-select">Voice:</label>
+        <select id="voice-select" disabled>
+          <option value="alloy">Alloy</option>
+          <option value="ash">Ash</option>
+          <option value="coral">Coral</option>
+          <option value="echo">Echo</option>
+          <option value="fable">Fable</option>
+          <option value="nova">Nova</option>
+          <option value="onyx">Onyx</option>
+          <option value="sage">Sage</option>
+          <option value="shimmer">Shimmer</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="speed-slider">Speed: <span id="speed-value">1.0x</span></label>
+        <input type="range" id="speed-slider" min="0.5" max="2" step="0.25" value="1" disabled>
+      </div>
+    </div>
+
+    <div class="reader-content" id="content">
+      <p class="placeholder">Click "Read" on a page to load content...</p>
+    </div>
+  </div>
+
+  <script type="module" src="reader.js"></script>
+</body>
+</html>

@@ -1,17 +1,21 @@
 {
-  "name": "Page Summarizer & Word Helper",
-  "version": "0.1",
+  "name": "AI Page Explorer",
+  "version": "1.0",
   "manifest_version": 3,
   "action": {
-    "default_title": "Summarize this page",
+    "default_title": "AI Page Explorer",
     "default_popup": "popup.html",
     "default_icon": {
       "19": "icons/icon19.png",
       "38": "icons/icon38.png"
     }
   },
+  "side_panel": {
+    "default_path": "reader/reader.html"
+  },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -23,6 +27,7 @@
       ],
       "js": [
         "lib/Readability.min.js",
+        "utils/truncatedHtml.js",
         "content.js"
       ],
       "run_at": "document_idle"
@@ -49,7 +54,9 @@
     "activeTab",
     "scripting",
     "storage",
-    "tabs"
+    "tabs",
+    "sidePanel",
+    "offscreen"
   ],
   "host_permissions": [
     "https://api.openai.com/*"

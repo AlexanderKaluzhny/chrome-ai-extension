@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  
+  
+  <title>AI Page Explorer Icon 1024x1024</title>
+  
+  
+  
+  <g transform="matrix(1.5 0 0 1.5 -256.0 -256.0)">
+    <rect x="212" y="192" width="600" height="640" rx="96" fill="#F9FAFB"/>
+    
+  
+  
+    <rect x="212" y="192" width="600" height="120" rx="96" fill="#E5E7EB"/>
+    
+  
+  
+    <circle cx="452" cy="252" r="22" fill="#38BDF8"/>
+    
+  
+    <circle cx="512" cy="252" r="22" fill="#A855F7"/>
+    
+  
+    <circle cx="572" cy="252" r="22" fill="#F97316"/>
+    
+  
+  
+    <circle cx="512" cy="220" r="8" fill="#EEF2FF"/>
+    
+  
+    <circle cx="480" cy="284" r="6" fill="#E0F2FE"/>
+    
+  
+    <circle cx="544" cy="286" r="6" fill="#F5F3FF"/>
+    
+  
+  
+    <rect x="252" y="356" width="320" height="32" rx="16" fill="#D1D5DB"/>
+    
+  
+    <rect x="252" y="424" width="240" height="28" rx="14" fill="#E5E7EB"/>
+    
+  
+    <rect x="252" y="492" width="280" height="28" rx="14" fill="#E5E7EB"/>
+    
+  
+    <rect x="252" y="560" width="220" height="28" rx="14" fill="#E5E7EB"/>
+    
+  
+  
+  
+    <ellipse cx="640" cy="580" rx="170" ry="120" fill="#EEF2FF"/>
+    
+  
+    <ellipse cx="640" cy="580" rx="130" ry="90" fill="#E0E7FF"/>
+    
+  
+  
+    <path d="M640 500L656 540L696 556L656 572L640 612L624 572L584 556L624 540L640 500Z" fill="#4F46E5"/>
+    
+  
+  
+    <path d="M560 580L570 604L594 614L570 624L560 648L550 624L526 614L550 604L560 580Z" fill="#38BDF8"/>
+    
+  
+    <path d="M720 560L728 580L748 588L728 596L720 616L712 596L692 588L712 580L720 560Z" fill="#A855F7"/>
+    
+  
+  
+    <circle cx="600" cy="540" r="6" fill="#EEF2FF"/>
+    
+  
+    <circle cx="682" cy="620" r="5" fill="#F9FAFB"/>
+    
+  
+    <circle cx="700" cy="540" r="5" fill="#E0F2FE"/>
+    
+  
+    <circle cx="620" cy="630" r="4" fill="#F5F3FF"/>
+    
+
+  </g>
+</svg>

@@ -37,8 +37,14 @@ document.addEventListener("dblclick", async () => {
     ? blockEl.textContent.trim()
     : document.body.innerText.trim();
 
+  // Capture target element for "Navigate in Reader" (must be done now, before selection is lost)
+  const clickedElement = selection.anchorNode?.nodeType === Node.TEXT_NODE
+    ? selection.anchorNode.parentElement
+    : selection.anchorNode;
+  const targetElement = clickedElement?.closest('p, h1, h2, h3, h4, h5, h6, li, blockquote, pre, div, article, section') || clickedElement;
+
   // Show the bubble with buttons instead of immediately fetching the definition
-  showBubbleWithOptions(selection.getRangeAt(0).getBoundingClientRect(), word, context);
+  showBubbleWithOptions(selection.getRangeAt(0).getBoundingClientRect(), word, context, targetElement);
 });
 
 // Helper to find the nearest block-level ancestor for broader context
@@ -56,7 +62,7 @@ function findBlockAncestor(el) {
 }
 
 // Show bubble with "Define" and "Specify prompt" buttons
-async function showBubbleWithOptions(rect, word, context) {
+async function showBubbleWithOptions(rect, word, context, targetElement) {
   // Make sure template is loaded
   if (!bubbleTemplate) {
     bubbleTemplate = await fetchBubbleTemplate();
@@ -174,7 +180,55 @@ async function showBubbleWithOptions(rect, word, context) {
   closeBtn.addEventListener('click', () => {
     bubble.remove();
   });
-  
+
+  // Pronounce button click handler (audio plays in offscreen document to bypass page CSP)
+  const pronounceBtn = bubble.querySelector('.pronounce-btn');
+
+  pronounceBtn.addEventListener('click', async () => {
+    pronounceBtn.textContent = '⏳';
+    pronounceBtn.disabled = true;
+
+    try {
+      const { error } = await chrome.runtime.sendMessage({
+        type: 'SYNTHESIZE_WORD',
+        text: word
+      });
+
+      if (error) throw new Error(error);
+    } catch (err) {
+      console.error('Pronunciation error:', err);
+    } finally {
+      pronounceBtn.textContent = '🔊';
+      pronounceBtn.disabled = false;
+    }
+  });
+
+  // Read from here button - check if reader panel is open
+  const readFromHereBtn = bubble.querySelector('.read-from-here-btn');
+
+  // Check if reader panel is open and enable button if so
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'READER_PING' });
+    if (response?.open) {
+      readFromHereBtn.disabled = false;
+      readFromHereBtn.title = '';
+    }
+  } catch (e) {
+    // Reader not open, button stays disabled
+  }
+
+  readFromHereBtn.addEventListener('click', async () => {
+    if (readFromHereBtn.disabled) return;
+
+    const paragraphIndex = getParagraphIndexFromTruncatedDoc(targetElement);
+
+    bubble.remove();
+    await chrome.runtime.sendMessage({
+      type: 'READ_FROM_HERE',
+      paragraphIndex
+    });
+  });
+
   // Click outside to close
   document.addEventListener("click", handleClickOutside);
 }
@@ -193,10 +247,12 @@ function removeExistingBubbles() {
 function handleClickOutside(e) {
   const bubble = document.getElementById("word-helper-bubble");
   if (!bubble) return;
-  
+
   // If click was outside the bubble, remove it
   if (!bubble.contains(e.target)) {
     bubble.remove();
     document.removeEventListener("click", handleClickOutside);
   }
 }
+
+// Truncated HTML helpers are in utils/truncatedHtml.js (injected before this script)

@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
   const summaryElement = document.getElementById("summary");
   const summarizeButton = document.getElementById("summarizeBtn");
+  const readButton = document.getElementById("readBtn");
   const customPromptElement = document.getElementById("customPrompt");
 
   // Load saved custom prompt from storage
@@ -50,4 +51,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Add click event listener to the button
   summarizeButton.addEventListener("click", summarizeTab);
+
+  // Handle Read button click
+  readButton.addEventListener("click", async () => {
+    readButton.disabled = true;
+    readButton.textContent = "Loading...";
+
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+      // Open side panel (must be in direct user gesture context)
+      await chrome.sidePanel.open({ windowId: tab.windowId });
+
+      // Tell reader to reload content from current tab
+      await chrome.runtime.sendMessage({ type: 'RELOAD_READER' });
+
+      window.close();
+    } catch (error) {
+      console.error("Error opening reader:", error);
+      summaryElement.textContent = "Error: " + error.message;
+      readButton.textContent = "Open in Reader";
+      readButton.disabled = false;
+    }
+  });
 });
